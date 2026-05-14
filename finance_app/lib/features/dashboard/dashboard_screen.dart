@@ -7,6 +7,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/models/models.dart';
 import '../../core/models/transaction_model.dart';
+import '../../widgets/shared/monthly_summary_card.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -80,6 +81,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             else ...[
               SliverToBoxAdapter(child: _buildBalanceCard()),
               SliverToBoxAdapter(child: _buildIncomeExpenseRow()),
+              const SliverToBoxAdapter(child: MonthlySummaryCard()),
               SliverToBoxAdapter(child: _buildQuickActions()),
               SliverToBoxAdapter(child: _buildMonthlyChart()),
               SliverToBoxAdapter(child: _buildAccountsRow()),

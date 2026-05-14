@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -25,7 +25,7 @@ class SmsService {
 
     _telephony.listenIncomingSms(
       onNewMessage: _onMessage,
-      onBackgroundMessage: backgroundSmsHandler,
+      onBackgroundMessage: smsBgHandler,
       listenInBackground: true,
     );
   }
@@ -49,7 +49,6 @@ class SmsService {
   }
 
   /// Scans the SMS inbox for the past [months] months.
-  /// Returns all detected transaction messages.
   Future<List<ParsedSmsTransaction>> scanInbox({int months = 3}) async {
     final granted = await _requestPermissions();
     if (!granted) return [];
@@ -76,20 +75,15 @@ class SmsService {
   void dispose() => _controller.close();
 }
 
-// Top-level background handler — must be outside any class
+// ─── Background handler (top-level, outside class) ──────────────────────────
 @pragma('vm:entry-point')
-void backgroundSmsHandler(SmsMessage message) {
-  // Lightweight: just parse and store a flag in shared_preferences
-  // The full popup is shown when app opens next time
+void smsBgHandler(SmsMessage message) {
   final parsed = SmsParser.parse(
     message.address ?? '',
     message.body ?? '',
   );
+  // Store parsed data for pickup on next app open (no UI available in bg isolate)
   if (parsed != null) {
-    // Store pending transaction for next app open
-    // (SharedPreferences access in background isolate)
+    // Could persist to shared_prefs here if needed
   }
 }
-
-// ignore: unnecessary_library_directive
-import 'dart:async';

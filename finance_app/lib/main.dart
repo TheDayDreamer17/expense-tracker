@@ -5,6 +5,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'core/db/database_helper.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/sms_service.dart';
+import 'core/services/recurring_transaction_service.dart';
 import 'app.dart';
 
 @pragma('vm:entry-point')
@@ -23,9 +24,16 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Init DB first so all services can use it
   await DatabaseHelper.instance.database;
+
+  // Process any overdue recurring transactions before UI loads
+  await RecurringTransactionService.instance.processOverdue();
+
+  // Init notifications and SMS
   await NotificationService.instance.initialize();
   await SmsService.instance.initialize();
 
   runApp(const ProviderScope(child: FinanceApp()));
 }
+
