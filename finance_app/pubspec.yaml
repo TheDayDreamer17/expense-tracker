@@ -1,0 +1,78 @@
+name: finance_app
+description: Smart Money Manager with SMS Intelligence
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Database
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # SMS
+  telephony: ^0.2.0
+  flutter_sms_inbox: ^1.0.4
+  permission_handler: ^11.3.1
+
+  # UI & Charts
+  fl_chart: ^0.68.0
+  table_calendar: ^3.1.2
+  lottie: ^3.1.2
+  shimmer: ^3.0.0
+  flutter_animate: ^4.5.0
+  google_fonts: ^6.2.1
+  iconsax: ^0.0.8
+  gap: ^3.0.1
+  cached_network_image: ^3.3.1
+
+  # Auth & Security
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.2
+
+  # File & Media
+  image_picker: ^1.1.2
+  share_plus: ^9.0.0
+  path_provider: ^2.1.4
+  file_picker: ^8.0.7
+
+  # Notifications
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+
+  # Utils
+  intl: ^0.19.0
+  uuid: ^4.4.2
+  collection: ^1.18.0
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.11
+  riverpod_generator: ^2.4.3
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/animations/
+    - assets/icons/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

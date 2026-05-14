@@ -1,0 +1,40 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+
+# Android
+finance_app/android/.gradle/
+finance_app/android/local.properties
+finance_app/android/key.properties
+finance_app/android/app/debug/
+finance_app/android/app/release/
+finance_app/android/app/*.jks
+finance_app/android/app/*.keystore
+
+# iOS
+finance_app/ios/Pods/
+finance_app/ios/.symlinks/
+finance_app/ios/Flutter/Flutter.framework
+finance_app/ios/Flutter/Flutter.podspec
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Secrets / Env
+.env
+.env.local
+*.env
+key.properties
+
+# Logs
+*.log
+pubspec.lock
