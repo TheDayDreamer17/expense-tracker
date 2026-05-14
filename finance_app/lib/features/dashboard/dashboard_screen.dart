@@ -119,6 +119,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       actions: [
         IconButton(
+          icon: const Icon(Icons.auto_awesome, color: AppColors.income),
+          onPressed: () => Navigator.pushNamed(context, '/copilot'),
+        ),
+        IconButton(
           icon: const Icon(Icons.notifications_outlined),
           onPressed: () {},
         ),

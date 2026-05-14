@@ -6,6 +6,7 @@ import '../../core/db/database_helper.dart';
 import '../../core/models/models.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/services/ai_service.dart';
 import 'package:uuid/uuid.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
@@ -18,6 +19,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   List<BudgetModel> _budgets = [];
   bool _loading = true;
   DateTime _selectedMonth = DateTime.now();
+  String? _prediction;
+  bool _loadingPrediction = false;
 
   @override
   void initState() {
@@ -46,7 +49,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       setState(() {
         _budgets = rows.map(BudgetModel.fromMap).toList();
         _loading = false;
+        _prediction = null;
       });
+
+      if (_selectedMonth.month == DateTime.now().month && _selectedMonth.year == DateTime.now().year && _totalBudget > 0) {
+        setState(() => _loadingPrediction = true);
+        final res = await ref.read(aiServiceProvider).getPredictiveBudget(_totalBudget, _totalSpent);
+        if (mounted) setState(() { _prediction = res; _loadingPrediction = false; });
+      }
     }
   }
 
@@ -71,6 +81,26 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   const SizedBox(height: 16),
                   if (_budgets.isNotEmpty) ...[
                     _buildSummaryCard(),
+                    if (_loadingPrediction || _prediction != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.income.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.income.withOpacity(0.3)),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.auto_awesome, color: AppColors.income, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _loadingPrediction 
+                                ? const Text('AI is analyzing your spending pace...', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic))
+                                : Text(_prediction!, style: const TextStyle(fontSize: 12)),
+                          ),
+                        ]),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     _buildPieChart(),
                     const SizedBox(height: 20),

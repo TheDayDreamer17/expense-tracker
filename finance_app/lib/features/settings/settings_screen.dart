@@ -140,6 +140,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ]),
 
+          _SectionHeader('AI Features'),
+          _SettingCard(children: [
+            _SettingRow(
+              icon: Icons.auto_awesome, label: 'Gemini API Key',
+              subtitle: settings.geminiApiKey?.isNotEmpty == true ? 'Connected' : 'Not configured',
+              onTap: _setApiKey,
+            ),
+          ]),
+
           _SectionHeader('Data'),
           _SettingCard(children: [
             _SettingRow(
@@ -175,6 +184,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final timeStr = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
       await ref.read(settingsProvider.notifier).update(settings.copyWith(incomeReminderTime: timeStr));
       await NotificationService.instance.scheduleMonthlyIncomeReminder(hour: time.hour, minute: time.minute);
+    }
+  }
+
+  Future<void> _setApiKey() async {
+    final ctrl = TextEditingController(text: ref.read(settingsProvider).geminiApiKey);
+    final key = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gemini API Key'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: 'Paste your API key here', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (key != null) {
+      final s = ref.read(settingsProvider);
+      await ref.read(settingsProvider.notifier).update(s.copyWith(geminiApiKey: key.isEmpty ? null : key));
     }
   }
 

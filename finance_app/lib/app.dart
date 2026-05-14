@@ -6,6 +6,7 @@ import 'features/auth/pin_lock_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/transactions/add_transaction_screen.dart';
 import 'features/transactions/transaction_list_screen.dart';
+import 'features/copilot/copilot_screen.dart';
 import 'features/accounts/accounts_screen.dart';
 import 'features/budget/budget_screen.dart';
 import 'features/reports/reports_screen.dart';
@@ -33,6 +34,7 @@ class FinanceApp extends ConsumerWidget {
       routes: {
         '/add-transaction': (_) => const AddTransactionScreen(),
         '/transactions': (_) => const TransactionListScreen(),
+        '/copilot': (_) => const CopilotScreen(),
         '/accounts': (_) => const AccountsScreen(),
         '/budget': (_) => const BudgetScreen(),
         '/reports': (_) => const ReportsScreen(),
