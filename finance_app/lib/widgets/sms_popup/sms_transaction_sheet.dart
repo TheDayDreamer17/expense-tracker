@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/models.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
@@ -27,6 +28,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   bool _saving = false;
   List<AccountModel> _accounts = [];
   bool _loadingAccounts = true;
+  bool _hasPrompted = false;
 
   @override
   void initState() {
@@ -57,22 +59,52 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
           _loadingAccounts = false;
           
           if (_accounts.isNotEmpty) {
+            bool hasMatchingCard = false;
             AccountModel? matched;
-            if (widget.parsed.accountLast4 != null && widget.parsed.accountLast4!.isNotEmpty) {
-              final last4 = widget.parsed.accountLast4!;
+            final last4 = widget.parsed.accountLast4;
+            if (last4 != null && last4.isNotEmpty) {
               for (final a in _accounts) {
+                if (widget.parsed.isCreditCard && a.type != 'CREDIT_CARD') continue;
                 if (a.name.toLowerCase().contains(last4.toLowerCase()) ||
                     a.id.toLowerCase().contains(last4.toLowerCase())) {
                   matched = a;
+                  if (widget.parsed.isCreditCard && a.type == 'CREDIT_CARD') {
+                    hasMatchingCard = true;
+                  }
                   break;
                 }
               }
+            } else if (widget.parsed.isCreditCard) {
+              final anyCard = _accounts.firstWhere(
+                (a) => a.type == 'CREDIT_CARD',
+                orElse: () => _accounts.first,
+              );
+              if (anyCard.type == 'CREDIT_CARD') {
+                matched = anyCard;
+                hasMatchingCard = true;
+              }
             }
+
             matched ??= _accounts.firstWhere(
-              (a) => a.type == 'BANK',
-              orElse: () => _accounts.first,
+              (a) => widget.parsed.isCreditCard ? a.type == 'CREDIT_CARD' : a.type == 'BANK',
+              orElse: () => _accounts.firstWhere(
+                (a) => a.type == 'BANK',
+                orElse: () => _accounts.first,
+              ),
             );
             _selectedAccountId = matched.id;
+
+            if (widget.parsed.isCreditCard && !hasMatchingCard && !_hasPrompted) {
+              _hasPrompted = true;
+              final ccLast4 = last4 ?? 'unknown';
+              SharedPreferences.getInstance().then((prefs) {
+                final ignoreKey = 'ignore_count_cc_$ccLast4';
+                final ignores = prefs.getInt(ignoreKey) ?? 0;
+                if (ignores < 5) {
+                  _promptCreateCardAccount(prefs, ignoreKey, ignores);
+                }
+              });
+            }
           }
         });
       }
@@ -81,6 +113,115 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
         setState(() {
           _loadingAccounts = false;
         });
+      }
+    }
+  }
+
+  void _promptCreateCardAccount(SharedPreferences prefs, String ignoreKey, int ignores) {
+    final last4 = widget.parsed.accountLast4 ?? '';
+    final bankPrefix = widget.parsed.cardName ?? 'Credit Card';
+    final suggestedName = '$bankPrefix${last4.isNotEmpty ? " XX$last4" : ""}';
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      final nameController = TextEditingController(text: suggestedName.trim());
+
+      final created = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Add Missing Credit Card?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'We detected a credit card transaction, but you do not have a matching card account configured. Would you like to create one now?',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Card Account Name',
+                  prefixIcon: Icon(Icons.credit_card),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await prefs.setInt(ignoreKey, ignores + 1);
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, false);
+                }
+              },
+              child: const Text('Ignore'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create Card'),
+            ),
+          ],
+        ),
+      );
+
+      if (created == true) {
+        final cardName = nameController.text.trim();
+        if (cardName.isNotEmpty) {
+          await _createCardAccount(cardName);
+        }
+      }
+    });
+  }
+
+  Future<void> _createCardAccount(String name) async {
+    try {
+      final db = DatabaseHelper.instance;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final id = 'cc_${widget.parsed.accountLast4 ?? const Uuid().v4()}';
+
+      final account = {
+        'id': id,
+        'name': name,
+        'type': 'CREDIT_CARD',
+        'balance': 0.0,
+        'currency': 'INR',
+        'color': 0xFFE91E63,
+        'icon': 'card',
+        'credit_limit': 100000.0,
+        'created_at': now,
+        'updated_at': now,
+      };
+
+      await db.insert('accounts', account);
+
+      // Reload accounts and select the new one!
+      await _loadAccounts();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💳 Card "$name" created successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating card: $e')),
+        );
       }
     }
   }
