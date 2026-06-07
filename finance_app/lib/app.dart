@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'core/db/database_helper.dart';
 import 'core/models/models.dart';
 import 'core/providers/settings_provider.dart';
+import 'core/providers/refresh_provider.dart';
 import 'core/utils/app_theme.dart';
 import 'features/auth/pin_lock_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
@@ -66,7 +67,6 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
-  int _currentIndex = 0;
   StreamSubscription<String>? _notificationSubscription;
   bool _isSheetOpen = false;
   final Set<String> _processedTxIds = {};
@@ -291,11 +291,12 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    final activeIndex = ref.watch(currentTabProvider);
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(index: activeIndex, children: _pages),
       bottomNavigationBar: _BottomNav(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        currentIndex: activeIndex,
+        onTap: (i) => ref.read(currentTabProvider.notifier).state = i,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.pushNamed(context, '/add-transaction'),
