@@ -383,6 +383,8 @@ class ParsedSmsTransaction {
   final String suggestedCategory;
   final String smsRaw;
   final String sender;
+  final bool isCreditCard;
+  final String? cardName;
 
   const ParsedSmsTransaction({
     this.id,
@@ -394,6 +396,8 @@ class ParsedSmsTransaction {
     required this.suggestedCategory,
     required this.smsRaw,
     required this.sender,
+    this.isCreditCard = false,
+    this.cardName,
   });
 
   Map<String, dynamic> toMap() {
@@ -407,6 +411,8 @@ class ParsedSmsTransaction {
       'suggestedCategory': suggestedCategory,
       'smsRaw': smsRaw,
       'sender': sender,
+      'isCreditCard': isCreditCard ? 1 : 0,
+      'cardName': cardName,
     };
   }
 
@@ -421,6 +427,8 @@ class ParsedSmsTransaction {
       suggestedCategory: map['suggestedCategory'] as String,
       smsRaw: map['smsRaw'] as String,
       sender: map['sender'] as String,
+      isCreditCard: map['isCreditCard'] == 1 || map['isCreditCard'] == true,
+      cardName: map['cardName'] as String?,
     );
   }
 }

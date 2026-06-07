@@ -26,6 +26,8 @@ void main() {
       expect(result!.amount, 1200.00);
       expect(result.type, 'EXPENSE');
       expect(result.suggestedCategory, 'cat_grocery');
+      expect(result.isCreditCard, isTrue);
+      expect(result.cardName, 'Axis Card');
     });
 
     test('Parses Income/Credited amounts correctly', () {

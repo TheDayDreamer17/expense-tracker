@@ -121,6 +121,30 @@ class SmsParser {
     final balance = balRaw != null ? double.tryParse(balRaw) : null;
     final category = _detectCategory(merchant ?? body);
 
+    final lowerBody = body.toLowerCase();
+    final lowerSender = sender.toLowerCase();
+    final isCreditCard = lowerBody.contains('credit card') ||
+        lowerBody.contains('spent on card') ||
+        lowerBody.contains('card ending') ||
+        lowerSender.contains('card') ||
+        lowerSender.contains('crd') ||
+        (lowerBody.contains('card') && isDebit);
+
+    String? cardName;
+    if (isCreditCard) {
+      if (lowerSender.contains('sbi') || lowerBody.contains('sbi card') || lowerBody.contains('sbicard')) {
+        cardName = 'SBI Card';
+      } else if (lowerSender.contains('hdfc') || lowerBody.contains('hdfc card')) {
+        cardName = 'HDFC Card';
+      } else if (lowerSender.contains('icici') || lowerBody.contains('icici card')) {
+        cardName = 'ICICI Card';
+      } else if (lowerSender.contains('axis') || lowerBody.contains('axis card')) {
+        cardName = 'Axis Card';
+      } else {
+        cardName = 'Credit Card';
+      }
+    }
+
     return ParsedSmsTransaction(
       amount: amount,
       type: type,
@@ -130,6 +154,8 @@ class SmsParser {
       suggestedCategory: category,
       smsRaw: body,
       sender: sender,
+      isCreditCard: isCreditCard,
+      cardName: cardName,
     );
   }
 
