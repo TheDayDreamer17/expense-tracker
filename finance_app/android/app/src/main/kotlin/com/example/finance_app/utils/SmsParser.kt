@@ -8,8 +8,8 @@ object SmsParser {
     private val amountRe = Pattern.compile("(?:Rs\\.?|INR|₹)\\s?([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
     private val typeDebitRe = Pattern.compile("\\b(debited|debit|spent|paid|withdrawn|purchase|payment)\\b", Pattern.CASE_INSENSITIVE)
     private val typeCreditRe = Pattern.compile("\\b(credited|credit|received|deposited|refund|cashback)\\b", Pattern.CASE_INSENSITIVE)
-    private val acctRe = Pattern.compile("(?:a/c|account|card|ac)(?:\\s+no\\.?|\\s+num\\.?|\\s+number)?[\\s\\*xX]*(\\d{4})", Pattern.CASE_INSENSITIVE)
-    private val merchantRe = Pattern.compile("(?:\\bat\\b|\\bto\\b|\\btowards\\b|\\bfor\\b)\\s+([A-Za-z0-9@\\-_ &]{3,40}?)(?:\\s+on|\\s+via|\\s+ref|\\s+upi|[.\\n,]|$)", Pattern.CASE_INSENSITIVE)
+    private val acctRe = Pattern.compile("(?:a/c|acct|account|card|ac)(?:\\s+no\\.?|\\s+num\\.?|\\s+number)?[\\s\\*xX]*(\\d{3,4})", Pattern.CASE_INSENSITIVE)
+    private val merchantRe = Pattern.compile("(?:\\bat\\b|\\bto\\b|\\btowards\\b|\\bfor\\b|\\bfrom\\b|\\bby\\b)\\s+([A-Za-z0-9@\\-_ &]{3,40}?)(?:\\s+on|\\s+via|\\s+ref|\\s+upi|[.\\n,]|$)", Pattern.CASE_INSENSITIVE)
     private val balanceRe = Pattern.compile("(?:avl\\.?\\s*bal(?:ance)?|available bal(?:ance)?|bal(?:ance)?[\\s:]*)[\\s:]+(?:Rs\\.?|INR|₹)\\s?([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
     private val upiRefRe = Pattern.compile("(?:upi\\s+ref(?:erence)?(?:\\s+no)?|ref\\s+no|txn\\s+id)[\\s:]*(\\d{12})", Pattern.CASE_INSENSITIVE)
 

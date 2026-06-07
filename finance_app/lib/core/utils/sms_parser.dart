@@ -34,11 +34,11 @@ class SmsParser {
     caseSensitive: false,
   );
   static final _acctRe = RegExp(
-    r'(?:a\/c|account|card|ac)(?:\s+no\.?|\s+num\.?|\s+number)?[\s\*xX]*(\d{4})',
+    r'(?:a\/c|acct|account|card|ac)(?:\s+no\.?|\s+num\.?|\s+number)?[\s\*xX]*(\d{3,4})',
     caseSensitive: false,
   );
   static final _merchantRe = RegExp(
-    r'(?:\bat\b|\bto\b|\btowards\b|\bfor\b)\s+([A-Za-z0-9@.\-_ &]{3,40}?)(?:\s+on|\s+via|\s+ref|\s+upi|[.\n,]|$)',
+    r'(?:\bat\b|\bto\b|\btowards\b|\bfor\b|\bfrom\b|\bby\b)\s+([A-Za-z0-9@.\-_ &]{3,40}?)(?:\s+on|\s+via|\s+ref|\s+upi|[.\n,]|$)',
     caseSensitive: false,
   );
   static final _balanceRe = RegExp(
