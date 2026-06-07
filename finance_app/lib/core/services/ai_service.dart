@@ -1,36 +1,46 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import '../db/database_helper.dart';
 import '../providers/settings_provider.dart';
 import '../utils/formatters.dart';
 
 final aiServiceProvider = Provider((ref) {
-  final apiKey = ref.watch(settingsProvider).geminiApiKey;
-  return AiService(apiKey);
+  final settings = ref.watch(settingsProvider);
+  return AiService(
+    provider: settings.aiProvider,
+    apiKey: settings.aiApiKey ?? settings.geminiApiKey,
+    endpoint: settings.aiCustomEndpoint,
+    model: settings.aiModel,
+  );
 });
 
 class AiService {
-  final String? _apiKey;
-  AiService(this._apiKey);
+  final String provider;
+  final String? apiKey;
+  final String? endpoint;
+  final String? model;
+
+  AiService({
+    required this.provider,
+    required this.apiKey,
+    required this.endpoint,
+    required this.model,
+  });
 
   Future<String> askCopilot(String prompt) async {
-    final apiKey = _apiKey;
-    if (apiKey == null || apiKey.isEmpty) {
-      return 'Please configure your Gemini API Key in Settings to use the AI Copilot.';
+    final key = apiKey;
+    if (provider != 'custom' && (key == null || key.isEmpty)) {
+      return 'Please configure your API Key in Settings to use the AI Copilot.';
     }
 
     try {
-      final model = GenerativeModel(
-        model: 'gemini-1.5-flash',
-        apiKey: apiKey,
-      );
-
       final db = DatabaseHelper.instance;
       final now = DateTime.now();
 
       // Get last 60 days of transactions for context
-      final cutoff =
-          now.subtract(const Duration(days: 60)).millisecondsSinceEpoch;
+      final cutoff = now.subtract(const Duration(days: 60)).millisecondsSinceEpoch;
       final txRows = await db.rawQuery('''
         SELECT t.amount, t.type, t.date, t.note, c.name as category 
         FROM transactions t LEFT JOIN categories c ON t.category_id = c.id
@@ -45,8 +55,7 @@ class AiService {
 
       // Get account balances
       final accRows = await db.query('accounts');
-      final accContext =
-          accRows.map((r) => '${r['name']}: ₹${r['balance']}').join(', ');
+      final accContext = accRows.map((r) => '${r['name']}: ₹${r['balance']}').join(', ');
 
       final fullPrompt = '''
 You are Smart Money Manager, a personalized financial AI assistant. 
@@ -64,19 +73,17 @@ Answer the user's following prompt using the data above. Be friendly, concise, a
 User Prompt: "$prompt"
 ''';
 
-      final content = [Content.text(fullPrompt)];
-      final response = await model.generateContent(content);
-      return response.text ?? 'Sorry, I could not generate a response.';
+      return _callAI(fullPrompt);
     } catch (e) {
-      return 'Error connecting to Gemini: $e';
+      return 'Error connecting to AI: $e';
     }
   }
 
-  Future<String> getPredictiveBudget(
-      double budgetLimit, double currentSpent) async {
-    final apiKey = _apiKey;
-    if (apiKey == null || apiKey.isEmpty)
+  Future<String> getPredictiveBudget(double budgetLimit, double currentSpent) async {
+    final key = apiKey;
+    if (provider != 'custom' && (key == null || key.isEmpty)) {
       return 'No API key configured for predictions.';
+    }
 
     try {
       final now = DateTime.now();
@@ -88,7 +95,6 @@ User Prompt: "$prompt"
       final dailyBurn = currentSpent / (daysPassed > 0 ? daysPassed : 1);
       final projectedTotal = currentSpent + (dailyBurn * remainingDays);
 
-      final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
       final prompt = '''
 The user has a monthly budget limit of ₹$budgetLimit.
 So far this month ($daysPassed days in, $remainingDays days left), they have spent ₹$currentSpent.
@@ -98,10 +104,96 @@ Write a 2-sentence friendly, insightful alert message to the user about this. Us
 If they are safe, encourage them. If they are projected to overspend, gently warn them to slow down.
 ''';
 
-      final response = await model.generateContent([Content.text(prompt)]);
-      return response.text?.trim() ?? 'Stay on track with your budget!';
+      return _callAI(prompt);
     } catch (e) {
       return 'Could not generate prediction.';
     }
+  }
+
+  Future<String> _callAI(String prompt) async {
+    final activeModel = model ?? '';
+    
+    if (provider == 'gemini') {
+      final geminiModel = GenerativeModel(
+        model: activeModel.isEmpty ? 'gemini-1.5-flash' : activeModel,
+        apiKey: apiKey!,
+      );
+      final response = await geminiModel.generateContent([Content.text(prompt)]);
+      return response.text ?? 'No response generated.';
+    }
+
+    if (provider == 'openai') {
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': activeModel.isEmpty ? 'gpt-4o-mini' : activeModel,
+          'messages': [
+            {'role': 'user', 'content': prompt}
+          ]
+        }),
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['choices'][0]['message']['content']?.toString() ?? 'Empty response.';
+      } else {
+        return 'OpenAI Error: ${response.statusCode} - ${response.body}';
+      }
+    }
+
+    if (provider == 'anthropic') {
+      final response = await http.post(
+        Uri.parse('https://api.anthropic.com/v1/messages'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey!,
+          'anthropic-version': '2023-06-01',
+        },
+        body: jsonEncode({
+          'model': activeModel.isEmpty ? 'claude-3-5-sonnet-20240620' : activeModel,
+          'max_tokens': 1024,
+          'messages': [
+            {'role': 'user', 'content': prompt}
+          ]
+        }),
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['content'][0]['text']?.toString() ?? 'Empty response.';
+      } else {
+        return 'Anthropic Error: ${response.statusCode} - ${response.body}';
+      }
+    }
+
+    if (provider == 'custom') {
+      final url = endpoint ?? '';
+      if (url.isEmpty) {
+        return 'Please configure a custom API Endpoint URL in Settings.';
+      }
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          if (apiKey != null && apiKey!.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'model': activeModel.isEmpty ? 'default' : activeModel,
+          'messages': [
+            {'role': 'user', 'content': prompt}
+          ]
+        }),
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['choices'][0]['message']['content']?.toString() ?? 'Empty response.';
+      } else {
+        return 'Custom API Error: ${response.statusCode} - ${response.body}';
+      }
+    }
+
+    return 'Unknown AI Provider: $provider';
   }
 }

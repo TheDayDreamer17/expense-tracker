@@ -110,6 +110,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               SliverToBoxAdapter(child: _buildQuickActions()),
               SliverToBoxAdapter(child: _buildMonthlyChart()),
               SliverToBoxAdapter(child: _buildAccountsRow()),
+              SliverToBoxAdapter(child: _buildCreditCardsRow()),
               SliverToBoxAdapter(child: _buildRecentHeader()),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
@@ -309,6 +310,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final actions = [
       {'icon': Icons.map_outlined, 'label': 'Trips', 'route': '/trips'},
       {'icon': Icons.flag_outlined, 'label': 'Goals', 'route': '/goals'},
+      {'icon': Icons.donut_large_rounded, 'label': 'Bifurcation', 'route': '/bifurcation'},
       {'icon': Icons.loop, 'label': 'Subs', 'route': '/subscriptions'},
       {'icon': Icons.pie_chart_outline, 'label': 'Net Worth', 'route': '/net-worth'},
       {'icon': Icons.favorite_border, 'label': 'Health', 'route': '/health-score'},
@@ -413,6 +415,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildAccountsRow() {
+    final nonCcAccounts = _accounts.where((a) => a.type != 'CREDIT_CARD').toList();
+    if (nonCcAccounts.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -432,9 +437,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _accounts.length,
+            itemCount: nonCcAccounts.length,
             itemBuilder: (_, i) {
-              final a = _accounts[i];
+              final a = nonCcAccounts[i];
               return Container(
                 margin: const EdgeInsets.only(right: 12),
                 padding: const EdgeInsets.all(14),
@@ -452,6 +457,103 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Text(
                       CurrencyFormatter.formatCompact(a.balance),
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(a.color)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCreditCardsRow() {
+    final ccAccounts = _accounts.where((a) => a.type == 'CREDIT_CARD').toList();
+    if (ccAccounts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text('Credit Cards', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        ),
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: ccAccounts.length,
+            itemBuilder: (_, i) {
+              final a = ccAccounts[i];
+              final outstanding = a.balance < 0 ? a.balance.abs() : 0.0;
+              final limit = a.creditLimit ?? 0.0;
+              final available = limit + a.balance;
+              final usagePercent = limit > 0 ? (outstanding / limit).clamp(0.0, 1.0) : 0.0;
+
+              return Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.all(14),
+                width: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(a.color), Color(a.color).withRed(100).withGreen(100)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(a.color).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            a.name,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.credit_card, color: Colors.white70, size: 16),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Outstanding: ₹${outstanding.toStringAsFixed(0)}',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                        if (limit > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Available: ₹${available.toStringAsFixed(0)} / ₹${limit.toStringAsFixed(0)}',
+                            style: const TextStyle(fontSize: 10, color: Colors.white70),
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: usagePercent,
+                              minHeight: 4,
+                              backgroundColor: Colors.white24,
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

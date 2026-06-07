@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:uuid/uuid.dart';
 import 'core/db/database_helper.dart';
 import 'core/models/models.dart';
 import 'core/providers/settings_provider.dart';
@@ -19,10 +20,12 @@ import 'features/budget/budget_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/trips/trips_screen.dart';
 import 'features/goals/goals_screen.dart';
+import 'features/goals/bifurcation_screen.dart';
 import 'features/subscriptions/subscriptions_screen.dart';
 import 'features/networth/net_worth_screen.dart';
 import 'features/health_score/health_score_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/settings/category_manager_screen.dart';
 import 'widgets/sms_popup/sms_transaction_sheet.dart';
 import 'core/services/native_sms_service.dart';
 import 'core/services/notification_service.dart';
@@ -50,10 +53,12 @@ class FinanceApp extends ConsumerWidget {
         '/reports': (_) => const ReportsScreen(),
         '/trips': (_) => const TripsScreen(),
         '/goals': (_) => const GoalsScreen(),
+        '/bifurcation': (_) => const BifurcationScreen(),
         '/subscriptions': (_) => const SubscriptionsScreen(),
         '/net-worth': (_) => const NetWorthScreen(),
         '/health-score': (_) => const HealthScoreScreen(),
         '/settings': (_) => const SettingsScreen(),
+        '/category-manager': (_) => const CategoryManagerScreen(),
       },
     );
   }
@@ -89,6 +94,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
     _listenForNotificationTaps();
     _checkLaunchTransaction();
     _checkFirstLaunchRestore();
+    _checkInvestmentPromo();
   }
 
   @override
@@ -287,6 +293,136 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
         _showTransactionSheet(parsed);
       });
     });
+  }
+
+  Future<void> _checkInvestmentPromo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentCount = prefs.getInt('app_open_count') ?? 0;
+      final newCount = currentCount + 1;
+      await prefs.setInt('app_open_count', newCount);
+
+      final shown = prefs.getBool('promo_investment_shown') ?? false;
+      if (newCount >= 3 && !shown) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showInvestmentPromoDialog(prefs);
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _showInvestmentPromoDialog(SharedPreferences prefs) {
+    final amountCtrl = TextEditingController();
+    final nameCtrl = TextEditingController(text: 'Mutual Funds SIP');
+    String subType = 'MF';
+    final subTypes = ['Bank', 'FD', 'MF', 'Stocks', 'Gold', 'Real Estate', 'Other'];
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          title: const Row(
+            children: [
+              Text('📈 ', style: TextStyle(fontSize: 24)),
+              Expanded(
+                child: Text(
+                  'Auto-Grow Your Wealth!',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Record your investments (mutual funds, FDs, stocks, etc.) inside Net Worth to easily monitor your wealth growth.',
+                style: TextStyle(fontSize: 13, color: AppColors.lightTextSecondary),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: subType,
+                decoration: const InputDecoration(labelText: 'Investment Type'),
+                items: subTypes.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (v) => setStateDialog(() => subType = v!),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Investment Name (e.g. SBI FD, Nifty SIP)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountCtrl,
+                decoration: const InputDecoration(labelText: 'Amount Put in Investment', prefixText: '₹ '),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await prefs.setBool('promo_investment_shown', true);
+                if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+              },
+              child: const Text('Never Show Again'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+              },
+              child: const Text('Remind Later'),
+            ),
+            ElevatedButton(
+              onPressed: saving ? null : () async {
+                final amt = double.tryParse(amountCtrl.text.trim());
+                final name = nameCtrl.text.trim();
+                if (amt == null || amt <= 0 || name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid name and amount')),
+                  );
+                  return;
+                }
+                
+                setStateDialog(() => saving = true);
+                
+                final db = DatabaseHelper.instance;
+                await db.insert('net_worth_entries', {
+                  'id': const Uuid().v4(),
+                  'entry_type': 'ASSET',
+                  'sub_type': subType,
+                  'name': name,
+                  'amount': amt,
+                  'date': DateTime.now().millisecondsSinceEpoch,
+                });
+                
+                await prefs.setBool('promo_investment_shown', true);
+                if (dialogCtx.mounted) {
+                  Navigator.pop(dialogCtx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Logged ₹${amt.toStringAsFixed(0)} in $name!'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Investment'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

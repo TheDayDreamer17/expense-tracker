@@ -106,6 +106,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
       final accMaps = await db.query('accounts', orderBy: 'created_at');
       final accounts = accMaps.map(AccountModel.fromMap).toList();
       if (mounted) {
+        final prefs = await SharedPreferences.getInstance();
         setState(() {
           _accounts = accounts;
           _loadingAccounts = false;
@@ -114,16 +115,30 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
             bool hasMatchingCard = false;
             AccountModel? matched;
             final last4 = widget.parsed.accountLast4;
+            
             if (last4 != null && last4.isNotEmpty) {
               for (final a in _accounts) {
-                if (widget.parsed.isCreditCard && a.type != 'CREDIT_CARD') continue;
-                if (a.name.toLowerCase().contains(last4.toLowerCase()) ||
-                    a.id.toLowerCase().contains(last4.toLowerCase())) {
+                final suffix = prefs.getString('account_suffix_${a.id}');
+                if (suffix == last4) {
                   matched = a;
-                  if (widget.parsed.isCreditCard && a.type == 'CREDIT_CARD') {
+                  if (a.type == 'CREDIT_CARD') {
                     hasMatchingCard = true;
                   }
                   break;
+                }
+              }
+              
+              if (matched == null) {
+                for (final a in _accounts) {
+                  if (widget.parsed.isCreditCard && a.type != 'CREDIT_CARD') continue;
+                  if (a.name.toLowerCase().contains(last4.toLowerCase()) ||
+                      a.id.toLowerCase().contains(last4.toLowerCase())) {
+                    matched = a;
+                    if (widget.parsed.isCreditCard && a.type == 'CREDIT_CARD') {
+                      hasMatchingCard = true;
+                    }
+                    break;
+                  }
                 }
               }
             } else if (widget.parsed.isCreditCard) {
@@ -149,13 +164,11 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
             if (widget.parsed.isCreditCard && !hasMatchingCard && !_hasPrompted) {
               _hasPrompted = true;
               final ccLast4 = last4 ?? 'unknown';
-              SharedPreferences.getInstance().then((prefs) {
-                final ignoreKey = 'ignore_count_cc_$ccLast4';
-                final ignores = prefs.getInt(ignoreKey) ?? 0;
-                if (ignores < 5) {
-                  _promptCreateCardAccount(prefs, ignoreKey, ignores);
-                }
-              });
+              final ignoreKey = 'ignore_count_cc_$ccLast4';
+              final ignores = prefs.getInt(ignoreKey) ?? 0;
+              if (ignores < 5) {
+                _promptCreateCardAccount(prefs, ignoreKey, ignores);
+              }
             }
           }
         });
@@ -727,6 +740,50 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
               return;
             }
           }
+        }
+      }
+    }
+
+    // Check Credit Card custom warning limit threshold
+    final selectedAcc = _accounts.firstWhere((a) => a.id == _selectedAccountId, orElse: () => _accounts.first);
+    if (selectedAcc.type == 'CREDIT_CARD') {
+      final prefs = await SharedPreferences.getInstance();
+      final warningThreshold = prefs.getDouble('cc_warning_limit_${selectedAcc.id}');
+      final limit = selectedAcc.creditLimit ?? 0.0;
+      
+      final outstanding = selectedAcc.balance < 0 ? selectedAcc.balance.abs() : 0.0;
+      final projected = outstanding + amount;
+      
+      final threshold = warningThreshold ?? (limit > 0 ? limit : null);
+      if (threshold != null && projected >= threshold) {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppColors.expense),
+                SizedBox(width: 8),
+                Text('Credit Card Alert'),
+              ],
+            ),
+            content: Text(
+              'This transaction of ₹${amount.toStringAsFixed(2)} will put your credit card outstanding at ₹${projected.toStringAsFixed(2)}, which exceeds your spending threshold of ₹${threshold.toStringAsFixed(2)}.\n\nDo you want to continue?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.expense),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) {
+          return;
         }
       }
     }

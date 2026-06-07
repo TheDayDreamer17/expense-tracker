@@ -163,15 +163,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ]),
 
+          _SectionHeader('Categories'),
+          _SettingCard(children: [
+            _SettingRow(
+              icon: Icons.category_outlined,
+              label: 'Manage Categories',
+              subtitle: 'Add, view, or delete expense and income categories',
+              onTap: () => Navigator.pushNamed(context, '/category-manager'),
+            ),
+          ]),
+
           _SectionHeader('AI Features'),
           _SettingCard(children: [
             _SettingRow(
               icon: Icons.auto_awesome,
-              label: 'Gemini API Key',
-              subtitle: settings.geminiApiKey?.isNotEmpty == true
-                  ? 'Connected'
-                  : 'Not configured',
-              onTap: _setApiKey,
+              label: 'AI Configuration',
+              subtitle: settings.aiApiKey?.isNotEmpty == true || (settings.aiProvider == 'custom' && settings.aiCustomEndpoint?.isNotEmpty == true)
+                  ? '${settings.aiProvider[0].toUpperCase()}${settings.aiProvider.substring(1)} | Configured'
+                  : '${settings.aiProvider[0].toUpperCase()}${settings.aiProvider.substring(1)} | Not configured',
+              onTap: _showAiConfigModal,
             ),
           ]),
 
@@ -245,35 +255,161 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _setApiKey() async {
-    final ctrl =
-        TextEditingController(text: ref.read(settingsProvider).geminiApiKey);
-    final key = await showDialog<String>(
+  Future<void> _showAiConfigModal() async {
+    final settings = ref.read(settingsProvider);
+    String selectedProvider = settings.aiProvider;
+    
+    final apiKeyCtrl = TextEditingController(text: settings.aiApiKey ?? settings.geminiApiKey);
+    final endpointCtrl = TextEditingController(text: settings.aiCustomEndpoint);
+    final modelCtrl = TextEditingController(text: settings.aiModel);
+
+    await showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Gemini API Key'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(
-              hintText: 'Paste your API key here',
-              border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
-              child: const Text('Save')),
-        ],
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final bgColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
+            final isCustom = selectedProvider == 'custom';
+
+            return Container(
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(2.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'AI Configuration',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    DropdownButtonFormField<String>(
+                      value: selectedProvider,
+                      decoration: const InputDecoration(
+                        labelText: 'AI Provider',
+                        prefixIcon: Icon(Icons.psychology_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'gemini', child: Text('Google Gemini')),
+                        DropdownMenuItem(value: 'openai', child: Text('OpenAI (GPT)')),
+                        DropdownMenuItem(value: 'anthropic', child: Text('Anthropic Claude')),
+                        DropdownMenuItem(value: 'custom', child: Text('Custom Endpoint')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() {
+                            selectedProvider = val;
+                            if (val == 'gemini') {
+                              modelCtrl.text = 'gemini-1.5-flash';
+                            } else if (val == 'openai') {
+                              modelCtrl.text = 'gpt-4o-mini';
+                            } else if (val == 'anthropic') {
+                              modelCtrl.text = 'claude-3-5-sonnet-20240620';
+                            } else if (val == 'custom') {
+                              modelCtrl.text = 'default';
+                            }
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: apiKeyCtrl,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: isCustom ? 'API Key (Optional)' : 'API Key',
+                        hintText: 'Enter API key',
+                        prefixIcon: const Icon(Icons.key),
+                      ),
+                    ),
+                    if (isCustom) ...[
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: endpointCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Custom API Endpoint',
+                          hintText: 'https://api.openai.com/v1/chat/completions',
+                          prefixIcon: Icon(Icons.link),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: modelCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Model Name',
+                        hintText: 'e.g. gemini-1.5-flash',
+                        prefixIcon: Icon(Icons.model_training),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final keyStr = apiKeyCtrl.text.trim();
+                        final epStr = endpointCtrl.text.trim();
+                        final modStr = modelCtrl.text.trim();
+                        
+                        await ref.read(settingsProvider.notifier).update(
+                          settings.copyWith(
+                            aiProvider: selectedProvider,
+                            aiApiKey: keyStr.isEmpty ? null : keyStr,
+                            geminiApiKey: selectedProvider == 'gemini' && keyStr.isNotEmpty ? keyStr : settings.geminiApiKey,
+                            aiCustomEndpoint: epStr,
+                            aiModel: modStr,
+                          ),
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('AI Configuration updated successfully!'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Save Configuration'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
-    if (key != null) {
-      final s = ref.read(settingsProvider);
-      await ref
-          .read(settingsProvider.notifier)
-          .update(s.copyWith(geminiApiKey: key.isEmpty ? null : key));
-    }
   }
 
   Future<void> _exportData() async {

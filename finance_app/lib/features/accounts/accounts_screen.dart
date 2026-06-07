@@ -7,6 +7,7 @@ import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/providers/refresh_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
   const AccountsScreen({super.key});
@@ -149,6 +150,10 @@ class _AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Color(account.color);
+    final isCreditCard = account.type == 'CREDIT_CARD';
+    final outstanding = isCreditCard ? (account.balance < 0 ? account.balance.abs() : 0.0) : account.balance;
+    final available = isCreditCard && account.creditLimit != null ? account.creditLimit! + account.balance : null;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -172,14 +177,23 @@ class _AccountCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(CurrencyFormatter.formatCompact(account.balance),
-                style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: account.balance >= 0
-                        ? AppColors.income
-                        : AppColors.expense)),
-            if (account.creditLimit != null)
+            Text(
+              isCreditCard
+                  ? 'Outstanding: ${CurrencyFormatter.formatCompact(outstanding)}'
+                  : CurrencyFormatter.formatCompact(account.balance),
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: isCreditCard
+                      ? (outstanding > 0 ? AppColors.expense : AppColors.income)
+                      : (account.balance >= 0 ? AppColors.income : AppColors.expense)),
+            ),
+            if (isCreditCard && available != null)
+              Text(
+                  'Available: ${CurrencyFormatter.formatCompact(available)}',
+                  style: const TextStyle(
+                      fontSize: 10, color: AppColors.lightTextSecondary))
+            else if (account.creditLimit != null)
               Text(
                   'Limit: ${CurrencyFormatter.formatCompact(account.creditLimit!)}',
                   style: const TextStyle(
@@ -214,6 +228,8 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
   final _nameCtrl = TextEditingController();
   final _balanceCtrl = TextEditingController();
   final _creditLimitCtrl = TextEditingController();
+  final _suffixCtrl = TextEditingController();
+  final _ccWarningCtrl = TextEditingController();
   String _type = 'BANK';
   int _color = 0xFF2196F3;
   bool _saving = false;
@@ -229,6 +245,18 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
       if (widget.account!.creditLimit != null) {
         _creditLimitCtrl.text = widget.account!.creditLimit!.toStringAsFixed(2);
       }
+      
+      SharedPreferences.getInstance().then((prefs) {
+        if (mounted) {
+          setState(() {
+            _suffixCtrl.text = prefs.getString('account_suffix_${widget.account!.id}') ?? '';
+            final warning = prefs.getDouble('cc_warning_limit_${widget.account!.id}');
+            if (warning != null) {
+              _ccWarningCtrl.text = warning.toStringAsFixed(2);
+            }
+          });
+        }
+      });
     }
   }
 
@@ -237,6 +265,8 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
     _nameCtrl.dispose();
     _balanceCtrl.dispose();
     _creditLimitCtrl.dispose();
+    _suffixCtrl.dispose();
+    _ccWarningCtrl.dispose();
     super.dispose();
   }
 
@@ -253,71 +283,86 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
         top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-              child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2)))),
-          const SizedBox(height: 16),
-          Text(widget.account == null ? 'Add Account' : 'Edit Account',
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 16),
-          TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Account Name',
-                  prefixIcon: Icon(Icons.account_balance_wallet))),
-          const SizedBox(height: 12),
-          TextField(
-              controller: _balanceCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Current Balance',
-                  prefixText: '₹ ',
-                  prefixIcon: Icon(Icons.currency_rupee)),
-              keyboardType: TextInputType.number),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _type,
-            decoration: const InputDecoration(
-                labelText: 'Account Type', prefixIcon: Icon(Icons.category)),
-            items: const [
-              DropdownMenuItem(value: 'CASH', child: Text('💵 Cash')),
-              DropdownMenuItem(value: 'BANK', child: Text('🏦 Bank')),
-              DropdownMenuItem(
-                  value: 'CREDIT_CARD', child: Text('💳 Credit Card')),
-              DropdownMenuItem(value: 'LOAN', child: Text('🏠 Loan')),
-              DropdownMenuItem(
-                  value: 'INVESTMENT', child: Text('📈 Investment')),
-            ],
-            onChanged: (v) => setState(() => _type = v!),
-          ),
-          if (_type == 'CREDIT_CARD') ...[
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Text(widget.account == null ? 'Add Account' : 'Edit Account',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            TextField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Account Name',
+                    prefixIcon: Icon(Icons.account_balance_wallet))),
             const SizedBox(height: 12),
             TextField(
-                controller: _creditLimitCtrl,
+                controller: _balanceCtrl,
                 decoration: const InputDecoration(
-                    labelText: 'Credit Limit', prefixText: '₹ '),
+                    labelText: 'Current Balance',
+                    prefixText: '₹ ',
+                    prefixIcon: Icon(Icons.currency_rupee)),
                 keyboardType: TextInputType.number),
-          ],
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white)
-                  : Text(widget.account == null ? 'Add Account' : 'Update'),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _type,
+              decoration: const InputDecoration(
+                  labelText: 'Account Type', prefixIcon: Icon(Icons.category)),
+              items: const [
+                DropdownMenuItem(value: 'CASH', child: Text('💵 Cash')),
+                DropdownMenuItem(value: 'BANK', child: Text('🏦 Bank')),
+                DropdownMenuItem(
+                    value: 'CREDIT_CARD', child: Text('💳 Credit Card')),
+                DropdownMenuItem(value: 'LOAN', child: Text('🏠 Loan')),
+                DropdownMenuItem(
+                    value: 'INVESTMENT', child: Text('📈 Investment')),
+              ],
+              onChanged: (v) => setState(() => _type = v!),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+                controller: _suffixCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Account/Card Suffix (Last 3-4 digits)',
+                    prefixIcon: Icon(Icons.pin_outlined)),
+                keyboardType: TextInputType.number),
+            if (_type == 'CREDIT_CARD') ...[
+              const SizedBox(height: 12),
+              TextField(
+                  controller: _creditLimitCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Credit Limit', prefixText: '₹ '),
+                  keyboardType: TextInputType.number),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: _ccWarningCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Custom Warning Spending Limit', prefixText: '₹ '),
+                  keyboardType: TextInputType.number),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white)
+                    : Text(widget.account == null ? 'Add Account' : 'Update'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -342,6 +387,22 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
       'created_at': widget.account?.createdAt.millisecondsSinceEpoch ?? now,
       'updated_at': now,
     });
+
+    final prefs = await SharedPreferences.getInstance();
+    final suffix = _suffixCtrl.text.trim();
+    if (suffix.isNotEmpty) {
+      await prefs.setString('account_suffix_$id', suffix);
+    } else {
+      await prefs.remove('account_suffix_$id');
+    }
+
+    final warningDouble = double.tryParse(_ccWarningCtrl.text);
+    if (_type == 'CREDIT_CARD' && warningDouble != null) {
+      await prefs.setDouble('cc_warning_limit_$id', warningDouble);
+    } else {
+      await prefs.remove('cc_warning_limit_$id');
+    }
+
     widget.onSaved();
     if (mounted) Navigator.pop(context);
   }

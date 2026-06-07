@@ -12,6 +12,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     _database ??= await _initDatabase();
+    await ensureStandardCategoriesExist(_database!);
     return _database!;
   }
 
@@ -198,45 +199,148 @@ class DatabaseHelper {
     await _insertDefaultData(db);
   }
 
+  static List<Map<String, dynamic>> getStandardCategories() {
+    final list = <Map<String, dynamic>>[];
+    
+    void addGroup(String id, String name, String type, String icon, int color, List<String> children) {
+      list.add({
+        'id': id,
+        'name': name,
+        'type': type,
+        'icon': icon,
+        'color': color,
+        'parent_id': null,
+      });
+      for (final child in children) {
+        final childId = '${id}_${child.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+        list.add({
+          'id': childId,
+          'name': child,
+          'type': type,
+          'icon': icon,
+          'color': color,
+          'parent_id': id,
+        });
+      }
+    }
+
+    // EXPENSES
+    addGroup('cat_housing', 'Housing', 'EXPENSE', 'home', 0xFF795548, [
+      'Rent', 'Home Loan EMI', 'Maintenance Charges', 'Property Tax',
+      'Repairs & Renovation', 'Furniture', 'Appliances'
+    ]);
+    addGroup('cat_utilities', 'Utilities', 'EXPENSE', 'flash', 0xFFFF9800, [
+      'Electricity', 'Water', 'Gas', 'Internet/WiFi', 'Mobile Recharge', 'DTH/Cable'
+    ]);
+    addGroup('cat_food', 'Food & Dining', 'EXPENSE', 'food', 0xFFFF5722, [
+      'Groceries', 'Vegetables & Fruits', 'Milk & Dairy', 'Restaurants', 'Fast Food', 'Cafes', 'Food Delivery (Swiggy/Zomato)'
+    ]);
+    addGroup('cat_transport', 'Transportation', 'EXPENSE', 'car', 0xFF2196F3, [
+      'Fuel/Petrol', 'Public Transport', 'Metro', 'Bus', 'Auto/Rickshaw',
+      'Taxi/Uber/Ola', 'Parking', 'Toll Charges', 'Vehicle Maintenance', 'Vehicle Insurance'
+    ]);
+    addGroup('cat_health', 'Health & Fitness', 'EXPENSE', 'heart', 0xFFE91E63, [
+      'Doctor Consultation', 'Medicines', 'Health Insurance', 'Lab Tests',
+      'Gym Membership', 'Yoga', 'Supplements', 'Protein Powder'
+    ]);
+    addGroup('cat_shopping', 'Shopping', 'EXPENSE', 'bag', 0xFF9C27B0, [
+      'Clothing', 'Footwear', 'Accessories', 'Electronics', 'Gadgets', 'Home Decor', 'Gifts'
+    ]);
+    addGroup('cat_entertainment', 'Entertainment', 'EXPENSE', 'tv', 0xFF673AB7, [
+      'Movies', 'OTT Subscriptions', 'Gaming', 'Books', 'Music', 'Hobbies'
+    ]);
+    addGroup('cat_travel', 'Travel', 'EXPENSE', 'plane', 0xFF009688, [
+      'Flights', 'Hotels', 'Local Transport', 'Sightseeing', 'Travel Insurance'
+    ]);
+    addGroup('cat_education', 'Education', 'EXPENSE', 'book', 0xFF3F51B5, [
+      'Courses', 'Certifications', 'Books', 'Workshops', 'Coaching'
+    ]);
+    addGroup('cat_pets', 'Pets', 'EXPENSE', 'dog', 0xFF4CAF50, [
+      'Pet Food', 'Vet Expenses', 'Grooming', 'Accessories'
+    ]);
+    addGroup('cat_family', 'Family', 'EXPENSE', 'people', 0xFF00BCD4, [
+      'Parents Support', 'Child Education', 'Child Care', 'Family Medical'
+    ]);
+    addGroup('cat_financial', 'Financial', 'EXPENSE', 'card', 0xFF607D8B, [
+      'Credit Card Bill', 'Loan EMI', 'Bank Charges', 'Interest Paid', 'Late Fees'
+    ]);
+    addGroup('cat_personal', 'Personal', 'EXPENSE', 'face', 0xFFFFC107, [
+      'Grooming', 'Salon', 'Spa', 'Cosmetics', 'Personal Care'
+    ]);
+    addGroup('cat_donations', 'Donations', 'EXPENSE', 'heart', 0xFF8BC34A, [
+      'Charity', 'Religious Donations', 'Crowdfunding'
+    ]);
+    addGroup('cat_other_exp', 'Miscellaneous', 'EXPENSE', 'dots', 0xFF9E9E9E, [
+      'Unknown', 'Misc Expense', 'Cash Withdrawal'
+    ]);
+
+    // INCOMES
+    addGroup('cat_salary', 'Salary', 'INCOME', 'money', 0xFF4CAF50, [
+      'Salary', 'Bonus', 'Incentives', 'Overtime', 'Joining Bonus'
+    ]);
+    addGroup('cat_freelance', 'Freelancing', 'INCOME', 'laptop', 0xFF2196F3, [
+      'Consulting', 'Freelance Projects', 'Side Hustle'
+    ]);
+    addGroup('cat_investments_inc', 'Investments', 'INCOME', 'chart', 0xFFFF9800, [
+      'Dividends', 'Interest Income', 'Capital Gains', 'Mutual Fund Redemption', 'Stock Profit'
+    ]);
+    addGroup('cat_rental_inc', 'Rental Income', 'INCOME', 'home', 0xFF795548, [
+      'House Rent Received', 'Commercial Rent'
+    ]);
+    addGroup('cat_other_inc', 'Other Income', 'INCOME', 'dots', 0xFF9E9E9E, [
+      'Gift Received', 'Cashback', 'Rewards', 'Referral Bonus', 'Tax Refund'
+    ]);
+    addGroup('cat_family_inc', 'Family', 'INCOME', 'people', 0xFF00BCD4, [
+      'Family Support', 'Pocket Money'
+    ]);
+    addGroup('cat_business_inc', 'Business', 'INCOME', 'briefcase', 0xFF9C27B0, [
+      'Business Revenue', 'Commission', 'Royalties'
+    ]);
+
+    // TRANSFERS
+    addGroup('cat_transfer', 'Transfer', 'TRANSFER', 'refresh', 0xFF607D8B, [
+      'Bank to Bank Transfer', 'Savings Transfer', 'Investment Transfer', 'Wallet Top-up',
+      'Credit Card Payment', 'Cash Deposit', 'Cash Withdrawal', 'UPI Wallet Transfer'
+    ]);
+
+    return list;
+  }
+
+  Future<void> ensureStandardCategoriesExist(Database db) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seeded = prefs.getBool('seeded_detailed_categories') ?? false;
+      if (!seeded) {
+        final list = getStandardCategories();
+        final batch = db.batch();
+        for (final cat in list) {
+          batch.insert('categories', cat, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        await batch.commit(noResult: true);
+        await prefs.setBool('seeded_detailed_categories', true);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _insertDefaultData(Database db) async {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // Default accounts
     final accounts = [
       {'id': 'acc_cash', 'name': 'Cash', 'type': 'CASH', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF4CAF50, 'icon': 'wallet', 'created_at': now, 'updated_at': now},
-      {'id': 'acc_bank', 'name': 'Bank Account', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF2196F3, 'icon': 'bank', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_sbi', 'name': 'SBI', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF2196F3, 'icon': 'bank', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_hdfc', 'name': 'HDFC', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF3F51B5, 'icon': 'bank', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_icici', 'name': 'ICICI', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF00BCD4, 'icon': 'bank', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_pnb', 'name': 'PNB', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFFFF5722, 'icon': 'bank', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_cc', 'name': 'Credit Card', 'type': 'CREDIT_CARD', 'balance': 0.0, 'currency': 'INR', 'color': 0xFFE91E63, 'icon': 'card', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_investments', 'name': 'Investments', 'type': 'INVESTMENT', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF4CAF50, 'icon': 'chart', 'created_at': now, 'updated_at': now},
     ];
     for (final a in accounts) {
       await db.insert('accounts', a);
     }
 
-    // Default expense categories
-    final expenseCategories = [
-      {'id': 'cat_food', 'name': 'Food & Dining', 'type': 'EXPENSE', 'icon': 'food', 'color': 0xFFFF5722},
-      {'id': 'cat_grocery', 'name': 'Groceries', 'type': 'EXPENSE', 'icon': 'cart', 'color': 0xFF4CAF50},
-      {'id': 'cat_transport', 'name': 'Transport', 'type': 'EXPENSE', 'icon': 'car', 'color': 0xFF2196F3},
-      {'id': 'cat_shopping', 'name': 'Shopping', 'type': 'EXPENSE', 'icon': 'bag', 'color': 0xFF9C27B0},
-      {'id': 'cat_entertainment', 'name': 'Entertainment', 'type': 'EXPENSE', 'icon': 'tv', 'color': 0xFFE91E63},
-      {'id': 'cat_health', 'name': 'Health', 'type': 'EXPENSE', 'icon': 'heart', 'color': 0xFFF44336},
-      {'id': 'cat_utilities', 'name': 'Utilities', 'type': 'EXPENSE', 'icon': 'flash', 'color': 0xFFFF9800},
-      {'id': 'cat_telecom', 'name': 'Telecom', 'type': 'EXPENSE', 'icon': 'mobile', 'color': 0xFF00BCD4},
-      {'id': 'cat_education', 'name': 'Education', 'type': 'EXPENSE', 'icon': 'book', 'color': 0xFF3F51B5},
-      {'id': 'cat_subscription', 'name': 'Subscriptions', 'type': 'EXPENSE', 'icon': 'refresh', 'color': 0xFF607D8B},
-      {'id': 'cat_travel', 'name': 'Travel', 'type': 'EXPENSE', 'icon': 'plane', 'color': 0xFF009688},
-      {'id': 'cat_other_exp', 'name': 'Others', 'type': 'EXPENSE', 'icon': 'dots', 'color': 0xFF9E9E9E},
-    ];
-
-    // Default income categories
-    final incomeCategories = [
-      {'id': 'cat_salary', 'name': 'Salary', 'type': 'INCOME', 'icon': 'money', 'color': 0xFF4CAF50},
-      {'id': 'cat_freelance', 'name': 'Freelance', 'type': 'INCOME', 'icon': 'laptop', 'color': 0xFF2196F3},
-      {'id': 'cat_business', 'name': 'Business', 'type': 'INCOME', 'icon': 'briefcase', 'color': 0xFF9C27B0},
-      {'id': 'cat_investment', 'name': 'Investment', 'type': 'INCOME', 'icon': 'chart', 'color': 0xFFFF9800},
-      {'id': 'cat_gift', 'name': 'Gift', 'type': 'INCOME', 'icon': 'gift', 'color': 0xFFE91E63},
-      {'id': 'cat_other_inc', 'name': 'Others', 'type': 'INCOME', 'icon': 'dots', 'color': 0xFF9E9E9E},
-    ];
-
-    for (final c in [...expenseCategories, ...incomeCategories]) {
+    final list = getStandardCategories();
+    for (final c in list) {
       await db.insert('categories', c);
     }
 

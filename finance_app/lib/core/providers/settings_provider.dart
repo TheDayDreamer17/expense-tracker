@@ -49,6 +49,10 @@ class AppSettings {
   final bool onboardingDone;
   final String? geminiApiKey;
   final bool localAutoBackupEnabled;
+  final String aiProvider;
+  final String? aiApiKey;
+  final String? aiCustomEndpoint;
+  final String? aiModel;
 
   const AppSettings({
     this.currency = 'INR',
@@ -61,6 +65,10 @@ class AppSettings {
     this.onboardingDone = false,
     this.geminiApiKey,
     this.localAutoBackupEnabled = true,
+    this.aiProvider = 'gemini',
+    this.aiApiKey,
+    this.aiCustomEndpoint = '',
+    this.aiModel = 'gemini-1.5-flash',
   });
 
   AppSettings copyWith({
@@ -68,6 +76,7 @@ class AppSettings {
     bool? incomeReminderEnabled, String? incomeReminderTime,
     bool? pinEnabled, bool? biometricEnabled, bool? onboardingDone,
     String? geminiApiKey, bool? localAutoBackupEnabled,
+    String? aiProvider, String? aiApiKey, String? aiCustomEndpoint, String? aiModel,
   }) {
     return AppSettings(
       currency: currency ?? this.currency,
@@ -80,6 +89,10 @@ class AppSettings {
       onboardingDone: onboardingDone ?? this.onboardingDone,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       localAutoBackupEnabled: localAutoBackupEnabled ?? this.localAutoBackupEnabled,
+      aiProvider: aiProvider ?? this.aiProvider,
+      aiApiKey: aiApiKey ?? this.aiApiKey,
+      aiCustomEndpoint: aiCustomEndpoint ?? this.aiCustomEndpoint,
+      aiModel: aiModel ?? this.aiModel,
     );
   }
 }
@@ -107,6 +120,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       onboardingDone: prefs.getBool('onboarding_done') ?? false,
       geminiApiKey: prefs.getString('gemini_api_key'),
       localAutoBackupEnabled: prefs.getBool('local_auto_backup_enabled') ?? true,
+      aiProvider: prefs.getString('ai_provider') ?? 'gemini',
+      aiApiKey: prefs.getString('ai_api_key'),
+      aiCustomEndpoint: prefs.getString('ai_custom_endpoint') ?? '',
+      aiModel: prefs.getString('ai_model') ?? 'gemini-1.5-flash',
     );
   }
 
@@ -126,6 +143,19 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       await prefs.setString('gemini_api_key', updated.geminiApiKey!);
     } else {
       await prefs.remove('gemini_api_key');
+    }
+    await prefs.setString('ai_provider', updated.aiProvider);
+    if (updated.aiApiKey != null) {
+      await prefs.setString('ai_api_key', updated.aiApiKey!);
+    } else {
+      await prefs.remove('ai_api_key');
+    }
+    await prefs.setString('ai_custom_endpoint', updated.aiCustomEndpoint ?? '');
+    await prefs.setString('ai_model', updated.aiModel ?? '');
+    
+    // Fallback sync for gemini key
+    if (updated.aiProvider == 'gemini' && updated.aiApiKey != null) {
+      await prefs.setString('gemini_api_key', updated.aiApiKey!);
     }
   }
 }

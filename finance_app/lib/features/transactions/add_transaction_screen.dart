@@ -542,6 +542,53 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
       }
     }
 
+    // Check Credit Card custom warning limit threshold
+    final selectedAcc = _accounts.firstWhere((a) => a.id == _selectedAccountId, orElse: () => _accounts.first);
+    if (selectedAcc.type == 'CREDIT_CARD') {
+      final prefs = await SharedPreferences.getInstance();
+      final warningThreshold = prefs.getDouble('cc_warning_limit_${selectedAcc.id}');
+      final limit = selectedAcc.creditLimit ?? 0.0;
+      
+      final outstanding = selectedAcc.balance < 0 ? selectedAcc.balance.abs() : 0.0;
+      final originalOutstanding = widget.existing != null && widget.existing!.accountId == _selectedAccountId
+          ? (outstanding - widget.existing!.amount).clamp(0.0, double.infinity)
+          : outstanding;
+      final projected = originalOutstanding + amount;
+      
+      final threshold = warningThreshold ?? (limit > 0 ? limit : null);
+      if (threshold != null && projected >= threshold) {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppColors.expense),
+                SizedBox(width: 8),
+                Text('Credit Card Alert'),
+              ],
+            ),
+            content: Text(
+              'This transaction of ₹${amount.toStringAsFixed(2)} will put your credit card outstanding at ₹${projected.toStringAsFixed(2)}, which exceeds your spending threshold of ₹${threshold.toStringAsFixed(2)}.\n\nDo you want to continue?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.expense),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+        if (confirm != true) {
+          return;
+        }
+      }
+    }
+
     setState(() => _saving = true);
     try {
       // Save category mapping for self-learning

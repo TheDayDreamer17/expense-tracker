@@ -7,6 +7,7 @@ import '../../core/db/database_helper.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SmsScannerScreen extends ConsumerStatefulWidget {
   const SmsScannerScreen({super.key});
@@ -62,14 +63,53 @@ class _SmsScannerScreenState extends ConsumerState<SmsScannerScreen> {
     setState(() => _importing = true);
     final db = DatabaseHelper.instance;
     final now = DateTime.now().millisecondsSinceEpoch;
+    final prefs = await SharedPreferences.getInstance();
+    
+    final accMaps = await db.query('accounts');
+    final accounts = accMaps.map(AccountModel.fromMap).toList();
+    
     int count = 0;
 
     for (final idx in _selected) {
       final r = _results[idx];
       final id = const Uuid().v4();
+      
+      String targetAccountId = 'acc_bank';
+      final last4 = r.parsed.accountLast4;
+      if (last4 != null && last4.isNotEmpty) {
+        for (final a in accounts) {
+          final suffix = prefs.getString('account_suffix_${a.id}');
+          if (suffix == last4) {
+            targetAccountId = a.id;
+            break;
+          }
+        }
+        
+        if (targetAccountId == 'acc_bank') {
+          for (final a in accounts) {
+            if (r.parsed.isCreditCard && a.type != 'CREDIT_CARD') continue;
+            if (a.name.toLowerCase().contains(last4.toLowerCase()) ||
+                a.id.toLowerCase().contains(last4.toLowerCase())) {
+              targetAccountId = a.id;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (targetAccountId == 'acc_bank') {
+        if (r.parsed.isCreditCard) {
+          final anyCc = accounts.firstWhere((a) => a.type == 'CREDIT_CARD', orElse: () => accounts.first);
+          targetAccountId = anyCc.id;
+        } else {
+          final anyBank = accounts.firstWhere((a) => a.type == 'BANK', orElse: () => accounts.first);
+          targetAccountId = anyBank.id;
+        }
+      }
+
       await db.insert('transactions', {
         'id': id,
-        'account_id': 'acc_bank',
+        'account_id': targetAccountId,
         'category_id': r.parsed.suggestedCategory,
         'amount': r.parsed.amount,
         'type': r.parsed.type,
@@ -83,11 +123,11 @@ class _SmsScannerScreenState extends ConsumerState<SmsScannerScreen> {
       });
 
       // Update Account Balance
-      final rows = await db.query('accounts', where: 'id = ?', whereArgs: ['acc_bank']);
+      final rows = await db.query('accounts', where: 'id = ?', whereArgs: [targetAccountId]);
       if (rows.isNotEmpty) {
         final current = (rows.first['balance'] as num).toDouble();
         final newBalance = r.parsed.type == 'INCOME' ? current + r.parsed.amount : current - r.parsed.amount;
-        await db.update('accounts', {'balance': newBalance, 'updated_at': now}, where: 'id = ?', whereArgs: ['acc_bank']);
+        await db.update('accounts', {'balance': newBalance, 'updated_at': now}, where: 'id = ?', whereArgs: [targetAccountId]);
       }
       count++;
     }
