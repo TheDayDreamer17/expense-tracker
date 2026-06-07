@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/providers/refresh_provider.dart';
 import '../../core/services/native_sms_service.dart';
+import '../shared/create_category_dialog.dart';
 
 class SmsTransactionSheet extends ConsumerStatefulWidget {
   final ParsedSmsTransaction parsed;
@@ -30,6 +31,10 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   bool _loadingAccounts = true;
   bool _hasPrompted = false;
 
+  List<CategoryModel> _categories = [];
+  bool _loadingCategories = true;
+  String _lastCheckedMerchant = '';
+
   @override
   void initState() {
     super.initState();
@@ -42,10 +47,57 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
     _merchantController.addListener(_onInputChanged);
 
     _loadAccounts();
+    _loadCategories();
+    _loadLearnedCategory();
   }
 
   void _onInputChanged() {
     setState(() {});
+    final currentMerchant = _merchantController.text.trim().toLowerCase();
+    if (currentMerchant != _lastCheckedMerchant) {
+      _lastCheckedMerchant = currentMerchant;
+      _loadLearnedCategory();
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final db = DatabaseHelper.instance;
+      final catMaps = await db.query('categories', orderBy: 'type, name');
+      final categories = catMaps.map(CategoryModel.fromMap).toList();
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _loadingCategories = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingCategories = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadLearnedCategory() async {
+    final merchant = _merchantController.text.trim();
+    if (merchant.isNotEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final key = 'merchant_cat_${merchant.toLowerCase()}';
+        final learnedCatId = prefs.getString(key);
+        if (learnedCatId != null && learnedCatId.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _selectedCategoryId = learnedCatId;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading learned category: $e');
+      }
+    }
   }
 
   Future<void> _loadAccounts() async {
@@ -546,6 +598,13 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   }
 
   String _categoryName(String id) {
+    final cat = _categories.firstWhere(
+      (c) => c.id == id,
+      orElse: () => const CategoryModel(id: '', name: 'Other', type: '', icon: '❓', color: 0),
+    );
+    if (cat.id.isNotEmpty) {
+      return '${cat.icon} ${cat.name}';
+    }
     const names = {
       'cat_food': '🍕 Food',
       'cat_grocery': '🛒 Groceries',
@@ -565,15 +624,32 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   }
 
   void _pickCategory() {
-    // Show category picker bottom sheet
     showModalBottomSheet(
       context: context,
       builder: (_) => _CategoryPicker(
         selected: _selectedCategoryId,
         type: _type,
+        categories: _categories,
         onSelected: (id) {
           setState(() => _selectedCategoryId = id);
           Navigator.pop(context);
+        },
+        onAddCategory: () async {
+          Navigator.pop(context);
+          final newCatId = await showDialog<String>(
+            context: context,
+            builder: (ctx) => CreateCategoryDialog(
+              initialType: _type,
+              transactionMonth: DateTime.now().month,
+              transactionYear: DateTime.now().year,
+            ),
+          );
+          if (newCatId != null) {
+            await _loadCategories();
+            setState(() {
+              _selectedCategoryId = newCatId;
+            });
+          }
         },
       ),
     );
@@ -587,8 +663,82 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
       );
       return;
     }
+
+    // Check Budget Limit threshold warning for EXPENSE
+    if (_type == 'EXPENSE') {
+      final db = DatabaseHelper.instance;
+      final now = DateTime.now();
+      final month = now.month;
+      final year = now.year;
+
+      final budgetRows = await db.query(
+        'budgets',
+        where: 'category_id = ? AND month = ? AND year = ?',
+        whereArgs: [_selectedCategoryId, month, year],
+      );
+
+      if (budgetRows.isNotEmpty) {
+        final budgetLimit = (budgetRows.first['amount'] as num).toDouble();
+        if (budgetLimit > 0) {
+          final startOfMonth = DateTime(year, month, 1).millisecondsSinceEpoch;
+          final endOfMonth = DateTime(year, month + 1, 1).millisecondsSinceEpoch;
+
+          final result = await db.rawQuery('''
+            SELECT SUM(amount) as total FROM transactions
+            WHERE category_id = ? AND type = 'EXPENSE' AND date >= ? AND date < ?
+          ''', [_selectedCategoryId, startOfMonth, endOfMonth]);
+
+          final totalSpent = (result.first['total'] as num?)?.toDouble() ?? 0.0;
+
+          if (totalSpent + amount >= 0.8 * budgetLimit) {
+            final percentage = ((totalSpent + amount) / budgetLimit * 100).toStringAsFixed(0);
+            final categoryRow = _categories.firstWhere(
+              (c) => c.id == _selectedCategoryId,
+              orElse: () => const CategoryModel(id: '', name: 'Selected Category', type: '', icon: '❓', color: 0),
+            );
+
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    SizedBox(width: 8),
+                    Text('Budget Alert'),
+                  ],
+                ),
+                content: Text(
+                  'This transaction of ₹${amount.toStringAsFixed(2)} will put you at $percentage% of your monthly budget limit (₹${budgetLimit.toStringAsFixed(2)}) for "${categoryRow.name}".\n\nDo you want to continue?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true) {
+              return;
+            }
+          }
+        }
+      }
+    }
+
     setState(() => _saving = true);
     try {
+      // Save category mapping for self-learning
+      final merchant = _merchantController.text.trim();
+      if (merchant.isNotEmpty && _type == 'EXPENSE') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('merchant_cat_${merchant.toLowerCase()}', _selectedCategoryId);
+      }
       final db = DatabaseHelper.instance;
       final now = DateTime.now().millisecondsSinceEpoch;
       final id = const Uuid().v4();
@@ -680,13 +830,22 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
 class _CategoryPicker extends StatelessWidget {
   final String selected;
   final String type;
+  final List<CategoryModel> categories;
   final ValueChanged<String> onSelected;
+  final VoidCallback onAddCategory;
 
-  const _CategoryPicker({required this.selected, required this.type, required this.onSelected});
+  const _CategoryPicker({
+    required this.selected,
+    required this.type,
+    required this.categories,
+    required this.onSelected,
+    required this.onAddCategory,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final items = type == 'EXPENSE' ? _expenseCategories : _incomeCategories;
+    final filteredCategories = categories.where((c) => c.type == type).toList();
+
     return ListView(
       shrinkWrap: true,
       padding: const EdgeInsets.all(16),
@@ -696,52 +855,56 @@ class _CategoryPicker extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: items.map((item) {
-            final isSelected = item['id'] == selected;
-            return GestureDetector(
-              onTap: () => onSelected(item['id']!),
+          children: [
+            ...filteredCategories.map((item) {
+              final isSelected = item.id == selected;
+              return GestureDetector(
+                onTap: () => onSelected(item.id),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${item.icon} ${item.name}',
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.primary,
+                      fontWeight: FontWeight.w600, fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            GestureDetector(
+              onTap: onAddCategory,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : AppColors.primary.withOpacity(0.08),
+                  color: AppColors.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary, width: 1.5),
                 ),
-                child: Text(
-                  item['label']!,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.primary,
-                    fontWeight: FontWeight.w600, fontSize: 13,
-                  ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, size: 16, color: AppColors.primary),
+                    SizedBox(width: 4),
+                    Text(
+                      'Add Custom...',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold, fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          }).toList(),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
       ],
     );
   }
-
-  static const _expenseCategories = [
-    {'id': 'cat_food', 'label': '🍕 Food'},
-    {'id': 'cat_grocery', 'label': '🛒 Groceries'},
-    {'id': 'cat_transport', 'label': '🚗 Transport'},
-    {'id': 'cat_shopping', 'label': '🛍️ Shopping'},
-    {'id': 'cat_entertainment', 'label': '🎬 Entertainment'},
-    {'id': 'cat_health', 'label': '💊 Health'},
-    {'id': 'cat_utilities', 'label': '⚡ Utilities'},
-    {'id': 'cat_telecom', 'label': '📱 Telecom'},
-    {'id': 'cat_education', 'label': '🎓 Education'},
-    {'id': 'cat_subscription', 'label': '🔄 Subscription'},
-    {'id': 'cat_other_exp', 'label': '❓ Other'},
-  ];
-
-  static const _incomeCategories = [
-    {'id': 'cat_salary', 'label': '💰 Salary'},
-    {'id': 'cat_freelance', 'label': '💻 Freelance'},
-    {'id': 'cat_business', 'label': '💼 Business'},
-    {'id': 'cat_investment', 'label': '📈 Investment'},
-    {'id': 'cat_gift', 'label': '🎁 Gift'},
-    {'id': 'cat_other_inc', 'label': '💵 Other'},
-  ];
 }

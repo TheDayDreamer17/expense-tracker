@@ -9,6 +9,7 @@ import '../../core/models/transaction_model.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/providers/refresh_provider.dart';
+import '../../widgets/shared/create_category_dialog.dart';
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
   final TransactionModel? existing;
@@ -75,8 +76,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
         _accounts = accMaps.map(AccountModel.fromMap).toList();
         _categories = catMaps.map(CategoryModel.fromMap).toList();
         _trips = tripMaps.map(TripModel.fromMap).toList();
-        _selectedAccountId =
-            _accounts.isNotEmpty ? _accounts.first.id : 'acc_cash';
+        if (_accounts.isNotEmpty && !_accounts.any((a) => a.id == _selectedAccountId)) {
+          _selectedAccountId = _accounts.first.id;
+        }
       });
     }
   }
@@ -275,13 +277,45 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
               value: _selectedCategoryId,
               hint: const Text('Select category'),
               isExpanded: true,
-              items: fieldCategories
-                  .map((c) => DropdownMenuItem(
-                        value: c.id,
-                        child: Text(c.name),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedCategoryId = v),
+              items: [
+                ...fieldCategories.map((c) => DropdownMenuItem(
+                      value: c.id,
+                      child: Text('${c.icon} ${c.name}'),
+                    )),
+                const DropdownMenuItem(
+                  value: 'action_add_category',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add, color: AppColors.primary, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Add Category...',
+                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              onChanged: (v) async {
+                if (v == 'action_add_category') {
+                  final newCatId = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => CreateCategoryDialog(
+                      initialType: _type == 'TRANSFER' ? 'EXPENSE' : _type,
+                      transactionMonth: _selectedDate.month,
+                      transactionYear: _selectedDate.year,
+                    ),
+                  );
+                  if (newCatId != null) {
+                    await _loadData();
+                    setState(() {
+                      _selectedCategoryId = newCatId;
+                    });
+                  }
+                } else {
+                  setState(() => _selectedCategoryId = v);
+                }
+              },
             ),
           ),
         ),
@@ -438,8 +472,83 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
           .showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
       return;
     }
+
+    // Check Budget Limit threshold warning for EXPENSE
+    if (_type == 'EXPENSE' && _selectedCategoryId != null) {
+      final db = DatabaseHelper.instance;
+      final month = _selectedDate.month;
+      final year = _selectedDate.year;
+
+      final budgetRows = await db.query(
+        'budgets',
+        where: 'category_id = ? AND month = ? AND year = ?',
+        whereArgs: [_selectedCategoryId, month, year],
+      );
+
+      if (budgetRows.isNotEmpty) {
+        final budgetLimit = (budgetRows.first['amount'] as num).toDouble();
+        if (budgetLimit > 0) {
+          final startOfMonth = DateTime(year, month, 1).millisecondsSinceEpoch;
+          final endOfMonth = DateTime(year, month + 1, 1).millisecondsSinceEpoch;
+
+          final result = await db.rawQuery('''
+            SELECT SUM(amount) as total FROM transactions
+            WHERE category_id = ? AND type = 'EXPENSE' AND date >= ? AND date < ? ${widget.existing != null ? "AND id != ?" : ""}
+          ''', [
+            _selectedCategoryId,
+            startOfMonth,
+            endOfMonth,
+            if (widget.existing != null) widget.existing!.id,
+          ].whereType<Object>().toList());
+
+          final totalSpent = (result.first['total'] as num?)?.toDouble() ?? 0.0;
+
+          if (totalSpent + amount >= 0.8 * budgetLimit) {
+            final percentage = ((totalSpent + amount) / budgetLimit * 100).toStringAsFixed(0);
+            final categoryRow = _categories.firstWhere((c) => c.id == _selectedCategoryId);
+
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    SizedBox(width: 8),
+                    Text('Budget Alert'),
+                  ],
+                ),
+                content: Text(
+                  'This transaction of ₹${amount.toStringAsFixed(2)} will put you at $percentage% of your monthly budget limit (₹${budgetLimit.toStringAsFixed(2)}) for "${categoryRow.name}".\n\nDo you want to continue?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true) {
+              return;
+            }
+          }
+        }
+      }
+    }
+
     setState(() => _saving = true);
     try {
+      // Save category mapping for self-learning
+      final note = _noteController.text.trim();
+      if (note.isNotEmpty && _selectedCategoryId != null && _type == 'EXPENSE') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('merchant_cat_${note.toLowerCase()}', _selectedCategoryId!);
+      }
       final db = DatabaseHelper.instance;
       final now = DateTime.now().millisecondsSinceEpoch;
       final id = widget.existing?.id ?? const Uuid().v4();
