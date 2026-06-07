@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../db/database_helper.dart';
@@ -15,21 +14,23 @@ class AiService {
   AiService(this._apiKey);
 
   Future<String> askCopilot(String prompt) async {
-    if (_apiKey == null || _apiKey.isEmpty) {
+    final apiKey = _apiKey;
+    if (apiKey == null || apiKey.isEmpty) {
       return 'Please configure your Gemini API Key in Settings to use the AI Copilot.';
     }
 
     try {
       final model = GenerativeModel(
         model: 'gemini-1.5-flash',
-        apiKey: _apiKey,
+        apiKey: apiKey,
       );
 
       final db = DatabaseHelper.instance;
       final now = DateTime.now();
-      
+
       // Get last 60 days of transactions for context
-      final cutoff = now.subtract(const Duration(days: 60)).millisecondsSinceEpoch;
+      final cutoff =
+          now.subtract(const Duration(days: 60)).millisecondsSinceEpoch;
       final txRows = await db.rawQuery('''
         SELECT t.amount, t.type, t.date, t.note, c.name as category 
         FROM transactions t LEFT JOIN categories c ON t.category_id = c.id
@@ -44,7 +45,8 @@ class AiService {
 
       // Get account balances
       final accRows = await db.query('accounts');
-      final accContext = accRows.map((r) => '${r['name']}: ₹${r['balance']}').join(', ');
+      final accContext =
+          accRows.map((r) => '${r['name']}: ₹${r['balance']}').join(', ');
 
       final fullPrompt = '''
 You are Smart Money Manager, a personalized financial AI assistant. 
@@ -70,8 +72,11 @@ User Prompt: "$prompt"
     }
   }
 
-  Future<String> getPredictiveBudget(double budgetLimit, double currentSpent) async {
-    if (_apiKey == null || _apiKey.isEmpty) return 'No API key configured for predictions.';
+  Future<String> getPredictiveBudget(
+      double budgetLimit, double currentSpent) async {
+    final apiKey = _apiKey;
+    if (apiKey == null || apiKey.isEmpty)
+      return 'No API key configured for predictions.';
 
     try {
       final now = DateTime.now();
@@ -83,7 +88,7 @@ User Prompt: "$prompt"
       final dailyBurn = currentSpent / (daysPassed > 0 ? daysPassed : 1);
       final projectedTotal = currentSpent + (dailyBurn * remainingDays);
 
-      final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _apiKey);
+      final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
       final prompt = '''
 The user has a monthly budget limit of ₹$budgetLimit.
 So far this month ($daysPassed days in, $remainingDays days left), they have spent ₹$currentSpent.

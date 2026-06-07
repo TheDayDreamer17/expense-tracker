@@ -6,6 +6,7 @@ import '../../core/models/models.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/providers/refresh_provider.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
   const AccountsScreen({super.key});
@@ -24,18 +25,29 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 
   Future<void> _load() async {
-    final rows = await DatabaseHelper.instance.query('accounts', orderBy: 'created_at');
-    if (mounted) setState(() { _accounts = rows.map(AccountModel.fromMap).toList(); _loading = false; });
+    final rows =
+        await DatabaseHelper.instance.query('accounts', orderBy: 'created_at');
+    if (mounted)
+      setState(() {
+        _accounts = rows.map(AccountModel.fromMap).toList();
+        _loading = false;
+      });
   }
 
   double get _netBalance => _accounts.fold(0, (s, a) => s + a.balance);
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(transactionUpdateProvider, (previous, next) {
+      _load();
+    });
     return Scaffold(
       appBar: AppBar(
         title: const Text('Accounts'),
-        actions: [IconButton(icon: const Icon(Icons.add), onPressed: () => _showAccountSheet())],
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.add), onPressed: () => _showAccountSheet())
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -48,18 +60,26 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+                      gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.primaryDark]),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Net Balance', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                        const Text('Net Balance',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 13)),
                         const SizedBox(height: 4),
                         Text(CurrencyFormatter.format(_netBalance),
-                            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
-                        Text('${_accounts.length} accounts', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                        Text('${_accounts.length} accounts',
+                            style: const TextStyle(
+                                color: Colors.white60, fontSize: 12)),
                       ],
                     ),
                   ).animate().fadeIn(),
@@ -67,18 +87,26 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
 
                   // Group by type
                   ..._groupedAccounts().entries.map((entry) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8, top: 4),
-                        child: Text(entry.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.lightTextSecondary)),
-                      ),
-                      ...entry.value.asMap().entries.map((e) => _AccountCard(
-                        account: e.value,
-                        onTap: () => _showAccountSheet(account: e.value),
-                      ).animate().fadeIn(delay: (e.key * 60).ms)),
-                    ],
-                  )),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8, top: 4),
+                            child: Text(entry.key,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.lightTextSecondary)),
+                          ),
+                          ...entry.value
+                              .asMap()
+                              .entries
+                              .map((e) => _AccountCard(
+                                    account: e.value,
+                                    onTap: () =>
+                                        _showAccountSheet(account: e.value),
+                                  ).animate().fadeIn(delay: (e.key * 60).ms)),
+                        ],
+                      )),
                 ],
               ),
             ),
@@ -95,13 +123,13 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
   }
 
   String _typeLabel(String type) => switch (type) {
-    'CASH' => '💵 Cash',
-    'BANK' => '🏦 Bank',
-    'CREDIT_CARD' => '💳 Credit Cards',
-    'LOAN' => '🏠 Loans',
-    'INVESTMENT' => '📈 Investments',
-    _ => '🗂 Other',
-  };
+        'CASH' => '💵 Cash',
+        'BANK' => '🏦 Bank',
+        'CREDIT_CARD' => '💳 Credit Cards',
+        'LOAN' => '🏠 Loans',
+        'INVESTMENT' => '📈 Investments',
+        _ => '🗂 Other',
+      };
 
   void _showAccountSheet({AccountModel? account}) {
     showModalBottomSheet(
@@ -126,23 +154,36 @@ class _AccountCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-          child: Center(child: Text(_typeEmoji(account.type), style: const TextStyle(fontSize: 22))),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12)),
+          child: Center(
+              child: Text(_typeEmoji(account.type),
+                  style: const TextStyle(fontSize: 22))),
         ),
-        title: Text(account.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(account.name,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(account.type.replaceAll('_', ' ').toLowerCase(),
-            style: const TextStyle(fontSize: 12, color: AppColors.lightTextSecondary)),
+            style: const TextStyle(
+                fontSize: 12, color: AppColors.lightTextSecondary)),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(CurrencyFormatter.formatCompact(account.balance),
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16,
-                    color: account.balance >= 0 ? AppColors.income : AppColors.expense)),
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: account.balance >= 0
+                        ? AppColors.income
+                        : AppColors.expense)),
             if (account.creditLimit != null)
-              Text('Limit: ${CurrencyFormatter.formatCompact(account.creditLimit!)}',
-                  style: const TextStyle(fontSize: 10, color: AppColors.lightTextSecondary)),
+              Text(
+                  'Limit: ${CurrencyFormatter.formatCompact(account.creditLimit!)}',
+                  style: const TextStyle(
+                      fontSize: 10, color: AppColors.lightTextSecondary)),
           ],
         ),
         onTap: onTap,
@@ -151,9 +192,13 @@ class _AccountCard extends StatelessWidget {
   }
 
   String _typeEmoji(String type) => switch (type) {
-    'CASH' => '💵', 'BANK' => '🏦', 'CREDIT_CARD' => '💳',
-    'LOAN' => '🏠', 'INVESTMENT' => '📈', _ => '🗂',
-  };
+        'CASH' => '💵',
+        'BANK' => '🏦',
+        'CREDIT_CARD' => '💳',
+        'LOAN' => '🏠',
+        'INVESTMENT' => '📈',
+        _ => '🗂',
+      };
 }
 
 class _AccountFormSheet extends StatefulWidget {
@@ -203,44 +248,73 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
-        left: 16, right: 16, top: 16,
+        left: 16,
+        right: 16,
+        top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+          Center(
+              child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
           Text(widget.account == null ? 'Add Account' : 'Edit Account',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Account Name', prefixIcon: Icon(Icons.account_balance_wallet))),
+          TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Account Name',
+                  prefixIcon: Icon(Icons.account_balance_wallet))),
           const SizedBox(height: 12),
-          TextField(controller: _balanceCtrl, decoration: const InputDecoration(labelText: 'Current Balance', prefixText: '₹ ', prefixIcon: Icon(Icons.currency_rupee)), keyboardType: TextInputType.number),
+          TextField(
+              controller: _balanceCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Current Balance',
+                  prefixText: '₹ ',
+                  prefixIcon: Icon(Icons.currency_rupee)),
+              keyboardType: TextInputType.number),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _type,
-            decoration: const InputDecoration(labelText: 'Account Type', prefixIcon: Icon(Icons.category)),
+            initialValue: _type,
+            decoration: const InputDecoration(
+                labelText: 'Account Type', prefixIcon: Icon(Icons.category)),
             items: const [
               DropdownMenuItem(value: 'CASH', child: Text('💵 Cash')),
               DropdownMenuItem(value: 'BANK', child: Text('🏦 Bank')),
-              DropdownMenuItem(value: 'CREDIT_CARD', child: Text('💳 Credit Card')),
+              DropdownMenuItem(
+                  value: 'CREDIT_CARD', child: Text('💳 Credit Card')),
               DropdownMenuItem(value: 'LOAN', child: Text('🏠 Loan')),
-              DropdownMenuItem(value: 'INVESTMENT', child: Text('📈 Investment')),
+              DropdownMenuItem(
+                  value: 'INVESTMENT', child: Text('📈 Investment')),
             ],
             onChanged: (v) => setState(() => _type = v!),
           ),
           if (_type == 'CREDIT_CARD') ...[
             const SizedBox(height: 12),
-            TextField(controller: _creditLimitCtrl, decoration: const InputDecoration(labelText: 'Credit Limit', prefixText: '₹ '), keyboardType: TextInputType.number),
+            TextField(
+                controller: _creditLimitCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Credit Limit', prefixText: '₹ '),
+                keyboardType: TextInputType.number),
           ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _saving ? null : _save,
-              child: _saving ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.white) : Text(widget.account == null ? 'Add Account' : 'Update'),
+              child: _saving
+                  ? const CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white)
+                  : Text(widget.account == null ? 'Add Account' : 'Update'),
             ),
           ),
         ],
@@ -255,10 +329,16 @@ class _AccountFormSheetState extends State<_AccountFormSheet> {
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = widget.account?.id ?? const Uuid().v4();
     await db.insert('accounts', {
-      'id': id, 'name': _nameCtrl.text.trim(), 'type': _type,
+      'id': id,
+      'name': _nameCtrl.text.trim(),
+      'type': _type,
       'balance': double.tryParse(_balanceCtrl.text) ?? 0,
-      'currency': 'INR', 'color': _color, 'icon': _type.toLowerCase(),
-      'credit_limit': _type == 'CREDIT_CARD' ? double.tryParse(_creditLimitCtrl.text) : null,
+      'currency': 'INR',
+      'color': _color,
+      'icon': _type.toLowerCase(),
+      'credit_limit': _type == 'CREDIT_CARD'
+          ? double.tryParse(_creditLimitCtrl.text)
+          : null,
       'created_at': widget.account?.createdAt.millisecondsSinceEpoch ?? now,
       'updated_at': now,
     });

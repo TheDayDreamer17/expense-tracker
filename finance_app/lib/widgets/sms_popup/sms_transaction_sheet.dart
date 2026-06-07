@@ -4,6 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/models/models.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/db/database_helper.dart';
+import '../../core/providers/refresh_provider.dart';
+import '../../core/services/native_sms_service.dart';
 
 class SmsTransactionSheet extends ConsumerStatefulWidget {
   final ParsedSmsTransaction parsed;
@@ -17,20 +21,131 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   late String _selectedCategoryId;
   late String _type;
   final _noteController = TextEditingController();
+  late final TextEditingController _amountController;
+  late final TextEditingController _merchantController;
   String _selectedAccountId = 'acc_bank';
   bool _saving = false;
+  List<AccountModel> _accounts = [];
+  bool _loadingAccounts = true;
 
   @override
   void initState() {
     super.initState();
     _selectedCategoryId = widget.parsed.suggestedCategory;
     _type = widget.parsed.type;
+    _amountController = TextEditingController(text: widget.parsed.amount.toStringAsFixed(2));
+    _merchantController = TextEditingController(text: widget.parsed.merchant ?? '');
+
+    _amountController.addListener(_onInputChanged);
+    _merchantController.addListener(_onInputChanged);
+
+    _loadAccounts();
+  }
+
+  void _onInputChanged() {
+    setState(() {});
+  }
+
+  Future<void> _loadAccounts() async {
+    try {
+      final db = DatabaseHelper.instance;
+      final accMaps = await db.query('accounts', orderBy: 'created_at');
+      final accounts = accMaps.map(AccountModel.fromMap).toList();
+      if (mounted) {
+        setState(() {
+          _accounts = accounts;
+          _loadingAccounts = false;
+          
+          if (_accounts.isNotEmpty) {
+            AccountModel? matched;
+            if (widget.parsed.accountLast4 != null && widget.parsed.accountLast4!.isNotEmpty) {
+              final last4 = widget.parsed.accountLast4!;
+              for (final a in _accounts) {
+                if (a.name.toLowerCase().contains(last4.toLowerCase()) ||
+                    a.id.toLowerCase().contains(last4.toLowerCase())) {
+                  matched = a;
+                  break;
+                }
+              }
+            }
+            matched ??= _accounts.firstWhere(
+              (a) => a.type == 'BANK',
+              orElse: () => _accounts.first,
+            );
+            _selectedAccountId = matched.id;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingAccounts = false;
+        });
+      }
+    }
+  }
+
+  void _toggleType() {
+    setState(() {
+      if (_type == 'EXPENSE') {
+        _type = 'INCOME';
+        _selectedCategoryId = 'cat_salary';
+      } else {
+        _type = 'EXPENSE';
+        _selectedCategoryId = 'cat_other_exp';
+      }
+    });
   }
 
   @override
   void dispose() {
+    _amountController.removeListener(_onInputChanged);
+    _merchantController.removeListener(_onInputChanged);
+    _amountController.dispose();
+    _merchantController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Widget _buildFieldCard({
+    required IconData icon,
+    required String label,
+    required Widget child,
+    VoidCallback? onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.darkCard : Colors.grey.shade50;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: Theme.of(context).dividerColor.withOpacity(0.15)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.lightTextSecondary)),
+                  const SizedBox(height: 2),
+                  child,
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -38,6 +153,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkSurface : Colors.white;
     final isExpense = _type == 'EXPENSE';
+    final parsedAmount = double.tryParse(_amountController.text) ?? 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -45,199 +161,245 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40, height: 4,
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header banner
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-
-          // Header banner
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isExpense
-                    ? [AppColors.expense.withOpacity(0.15), AppColors.expense.withOpacity(0.05)]
-                    : [AppColors.income.withOpacity(0.15), AppColors.income.withOpacity(0.05)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isExpense ? AppColors.expense.withOpacity(0.3) : AppColors.income.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isExpense ? AppColors.expense : AppColors.income,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    isExpense ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                    color: Colors.white, size: 22,
-                  ),
+                gradient: LinearGradient(
+                  colors: isExpense
+                      ? [AppColors.expense.withOpacity(0.15), AppColors.expense.withOpacity(0.05)]
+                      : [AppColors.income.withOpacity(0.15), AppColors.income.withOpacity(0.05)],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            '📲 Transaction Detected',
-                            style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w500,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        CurrencyFormatter.format(widget.parsed.amount),
-                        style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w700,
-                          color: isExpense ? AppColors.expense : AppColors.income,
-                        ),
-                      ),
-                      if (widget.parsed.merchant != null)
-                        Text(
-                          widget.parsed.merchant!,
-                          style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                        ),
-                    ],
-                  ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isExpense ? AppColors.expense.withOpacity(0.3) : AppColors.income.withOpacity(0.3),
                 ),
-                // Type toggle
-                GestureDetector(
-                  onTap: () => setState(() => _type = _type == 'EXPENSE' ? 'INCOME' : 'EXPENSE'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isExpense ? AppColors.expense : AppColors.income,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      isExpense ? 'Debit' : 'Credit',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.2),
-
-          // Info row
-          if (widget.parsed.accountLast4 != null || widget.parsed.balance != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              ),
               child: Row(
                 children: [
-                  if (widget.parsed.accountLast4 != null) ...[
-                    const Icon(Icons.credit_card, size: 14, color: AppColors.primary),
-                    const SizedBox(width: 4),
-                    Text('••${widget.parsed.accountLast4}', style: const TextStyle(fontSize: 12)),
-                    const SizedBox(width: 16),
-                  ],
-                  if (widget.parsed.balance != null) ...[
-                    const Icon(Icons.account_balance_wallet, size: 14, color: AppColors.income),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Bal: ${CurrencyFormatter.format(widget.parsed.balance!)}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-          const Divider(height: 24, indent: 16, endIndent: 16),
-
-          // Category selector
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                const Text('Category', style: TextStyle(fontWeight: FontWeight.w600)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: _pickCategory,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  Container(
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      color: isExpense ? AppColors.expense : AppColors.income,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Icon(
+                      isExpense ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                      color: Colors.white, size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_categoryName(_selectedCategoryId),
-                            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.edit, size: 14, color: AppColors.primary),
+                        Text(
+                          '📲 Transaction Detected',
+                          style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w500,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          CurrencyFormatter.format(parsedAmount),
+                          style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w700,
+                            color: isExpense ? AppColors.expense : AppColors.income,
+                          ),
+                        ),
+                        if (_merchantController.text.isNotEmpty)
+                          Text(
+                            _merchantController.text,
+                            style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                          ),
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Note field
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
-              controller: _noteController,
-              decoration: const InputDecoration(
-                hintText: 'Add a note (optional)',
-                prefixIcon: Icon(Icons.note_outlined, size: 18),
-              ),
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: AppColors.primary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  // Type toggle
+                  GestureDetector(
+                    onTap: _toggleType,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isExpense ? AppColors.expense : AppColors.income,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isExpense ? 'Debit' : 'Credit',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
                     ),
-                    child: const Text('Dismiss', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
                   ),
+                ],
+              ),
+            ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.2),
+
+            // Info row
+            if (widget.parsed.accountLast4 != null || widget.parsed.balance != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Row(
+                  children: [
+                    if (widget.parsed.accountLast4 != null) ...[
+                      const Icon(Icons.credit_card, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text('••${widget.parsed.accountLast4}', style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 16),
+                    ],
+                    if (widget.parsed.balance != null) ...[
+                      const Icon(Icons.account_balance_wallet, size: 14, color: AppColors.income),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Bal: ${CurrencyFormatter.format(widget.parsed.balance!)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _saveTransaction,
-                    child: _saving
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Save Transaction'),
-                  ),
+              ),
+
+            const Divider(height: 24, indent: 16, endIndent: 16),
+
+            // Scrollable Fields List
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Amount Field
+                    _buildFieldCard(
+                      icon: Icons.currency_rupee_rounded,
+                      label: 'Amount',
+                      child: TextField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration.collapsed(hintText: 'Enter amount'),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+
+                    // Merchant Field
+                    _buildFieldCard(
+                      icon: Icons.storefront_rounded,
+                      label: 'Merchant / Payee',
+                      child: TextField(
+                        controller: _merchantController,
+                        decoration: const InputDecoration.collapsed(hintText: 'Enter merchant or payee'),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+
+                    // Account Field
+                    _loadingAccounts
+                        ? _buildFieldCard(
+                            icon: Icons.account_balance_wallet_outlined,
+                            label: 'Account',
+                            child: const Text('Loading accounts...', style: TextStyle(fontSize: 14)),
+                          )
+                        : _buildFieldCard(
+                            icon: Icons.account_balance_wallet_outlined,
+                            label: 'Account',
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _selectedAccountId,
+                                isExpanded: true,
+                                items: _accounts
+                                    .map((a) => DropdownMenuItem(
+                                          value: a.id,
+                                          child: Text('${a.name} (₹${a.balance.toStringAsFixed(2)})', style: const TextStyle(fontSize: 14)),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _selectedAccountId = v!),
+                              ),
+                            ),
+                          ),
+
+                    // Category Field
+                    _buildFieldCard(
+                      icon: Icons.category_outlined,
+                      label: 'Category',
+                      onTap: _pickCategory,
+                      child: Row(
+                        children: [
+                          Text(_categoryName(_selectedCategoryId),
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          const Spacer(),
+                          const Icon(Icons.chevron_right_rounded, size: 16, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+
+                    // Note Field
+                    _buildFieldCard(
+                      icon: Icons.notes_outlined,
+                      label: 'Note',
+                      child: TextField(
+                        controller: _noteController,
+                        decoration: const InputDecoration.collapsed(hintText: 'Add a note...'),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+
+            // Action buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Dismiss', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _saveTransaction,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: _saving
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Save Transaction', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -277,15 +439,68 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   }
 
   Future<void> _saveTransaction() async {
+    final amount = double.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid amount')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
-      // Save via transaction provider
-      // ref.read(transactionRepositoryProvider).addTransaction(...)
+      final db = DatabaseHelper.instance;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final id = const Uuid().v4();
+
+      final tx = {
+        'id': id,
+        'account_id': _selectedAccountId,
+        'category_id': _selectedCategoryId,
+        'amount': amount,
+        'type': _type,
+        'date': now,
+        'note': _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
+        'receipt_path': null,
+        'is_recurring': 0,
+        'is_template': 0,
+        'next_due_date': null,
+        'recurrence_rule': null,
+        'trip_id': null,
+        'sms_raw': widget.parsed.smsRaw,
+        'is_sms_imported': 1,
+        'created_at': now,
+        'updated_at': now,
+      };
+
+      await db.insert('transactions', tx);
+
+      // Audit log
+      await db.insert('audit_logs', {
+        'id': const Uuid().v4(),
+        'transaction_id': id,
+        'action': 'CREATE',
+        'after_data': tx.toString(),
+        'created_at': now,
+      });
+
+      // Update account balance
+      await _updateAccountBalance(_selectedAccountId, amount, _type);
+
+      // Delete from native SMS transactions Room DB so it doesn't get picked up again
+      if (widget.parsed.id != null) {
+        await NativeSmsService.instance.deleteTransaction(widget.parsed.id!);
+      }
+
+      // Refresh all screens watching this provider
+      ref.read(transactionUpdateProvider.notifier).state++;
+
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Transaction saved: ${CurrencyFormatter.format(widget.parsed.amount)}'),
+            content: Text('Transaction saved: ${CurrencyFormatter.format(amount)}'),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -293,8 +508,31 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
         );
       }
     } catch (e) {
-      setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving: $e')),
+        );
+      }
     }
+  }
+
+  Future<void> _updateAccountBalance(
+      String accountId, double amount, String type) async {
+    final db = DatabaseHelper.instance;
+    final rows =
+        await db.query('accounts', where: 'id = ?', whereArgs: [accountId]);
+    if (rows.isEmpty) return;
+    final current = (rows.first['balance'] as num).toDouble();
+    final newBalance = type == 'INCOME' ? current + amount : current - amount;
+    await db.update(
+        'accounts',
+        {
+          'balance': newBalance,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: [accountId]);
   }
 }
 

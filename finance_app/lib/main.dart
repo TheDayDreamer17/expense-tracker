@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'core/db/database_helper.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/sms_service.dart';
+import 'core/services/native_sms_service.dart';
 import 'core/services/recurring_transaction_service.dart';
 import 'app.dart';
 
@@ -31,8 +31,8 @@ void main() async {
   await RecurringTransactionService.instance.processOverdue();
 
   // Init notifications and SMS
-  await NotificationService.instance.initialize();
-  await SmsService.instance.initialize();
+  await NotificationService.instance.initialize(isMainApp: true);
+  await NativeSmsService.instance.initialize();
 
   runApp(const ProviderScope(child: FinanceApp()));
 }

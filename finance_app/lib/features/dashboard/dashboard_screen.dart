@@ -8,6 +8,7 @@ import '../../core/db/database_helper.dart';
 import '../../core/models/models.dart';
 import '../../core/models/transaction_model.dart';
 import '../../widgets/shared/monthly_summary_card.dart';
+import '../../core/providers/refresh_provider.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -69,6 +70,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(transactionUpdateProvider, (previous, next) {
+      _loadData();
+    });
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadData,
@@ -123,8 +127,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onPressed: () => Navigator.pushNamed(context, '/copilot'),
         ),
         IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          onPressed: () {},
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.pushNamed(context, '/settings'),
         ),
         IconButton(
           icon: const Icon(Icons.search),
@@ -236,6 +240,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildMonthlyChart() {
+    final hasData = _monthIncome > 0 || _monthExpense > 0;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
@@ -249,34 +254,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           const Text('This Month', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 120,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.center,
-                maxY: (_monthIncome > _monthExpense ? _monthIncome : _monthExpense) * 1.2,
-                barGroups: [
-                  BarChartGroupData(x: 0, barRods: [
-                    BarChartRodData(toY: _monthIncome, color: AppColors.income, width: 40, borderRadius: BorderRadius.circular(8)),
-                  ]),
-                  BarChartGroupData(x: 1, barRods: [
-                    BarChartRodData(toY: _monthExpense, color: AppColors.expense, width: 40, borderRadius: BorderRadius.circular(8)),
-                  ]),
-                ],
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (v, _) => Text(v == 0 ? 'Income' : 'Expense', style: const TextStyle(fontSize: 11)),
-                  )),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          if (!hasData)
+            const SizedBox(
+              height: 120,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bar_chart_outlined, color: Colors.grey, size: 36),
+                    SizedBox(height: 8),
+                    Text(
+                      'No transactions logged this month',
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                  ],
                 ),
-                gridData: const FlGridData(show: false),
-                borderData: FlBorderData(show: false),
+              ),
+            )
+          else
+            SizedBox(
+              height: 120,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.center,
+                  maxY: (_monthIncome > _monthExpense ? _monthIncome : _monthExpense) * 1.2,
+                  barGroups: [
+                    BarChartGroupData(x: 0, barRods: [
+                      BarChartRodData(toY: _monthIncome, color: AppColors.income, width: 40, borderRadius: BorderRadius.circular(8)),
+                    ]),
+                    BarChartGroupData(x: 1, barRods: [
+                      BarChartRodData(toY: _monthExpense, color: AppColors.expense, width: 40, borderRadius: BorderRadius.circular(8)),
+                    ]),
+                  ],
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) => Text(v == 0 ? 'Income' : 'Expense', style: const TextStyle(fontSize: 11)),
+                    )),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                ),
               ),
             ),
-          ),
         ],
       ),
     ).animate().fadeIn(delay: 200.ms);

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/models/models.dart';
@@ -19,11 +18,19 @@ class _NetWorthScreenState extends ConsumerState<NetWorthScreen> {
   bool _loading = true;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
-    final rows = await DatabaseHelper.instance.query('net_worth_entries', orderBy: 'date DESC');
-    if (mounted) setState(() { _entries = rows.map(NetWorthEntry.fromMap).toList(); _loading = false; });
+    final rows = await DatabaseHelper.instance
+        .query('net_worth_entries', orderBy: 'date DESC');
+    if (mounted)
+      setState(() {
+        _entries = rows.map(NetWorthEntry.fromMap).toList();
+        _loading = false;
+      });
   }
 
   // Latest value per name
@@ -35,8 +42,12 @@ class _NetWorthScreenState extends ConsumerState<NetWorthScreen> {
     return map;
   }
 
-  double get _totalAssets => _latestEntries.values.where((e) => e.isAsset).fold(0, (s, e) => s + e.amount);
-  double get _totalLiabilities => _latestEntries.values.where((e) => e.isLiability).fold(0, (s, e) => s + e.amount);
+  double get _totalAssets => _latestEntries.values
+      .where((e) => e.isAsset)
+      .fold(0, (s, e) => s + e.amount);
+  double get _totalLiabilities => _latestEntries.values
+      .where((e) => e.isLiability)
+      .fold(0, (s, e) => s + e.amount);
   double get _netWorth => _totalAssets - _totalLiabilities;
 
   @override
@@ -46,7 +57,9 @@ class _NetWorthScreenState extends ConsumerState<NetWorthScreen> {
     final liabilities = latest.values.where((e) => e.isLiability).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Net Worth'), actions: [IconButton(icon: const Icon(Icons.add), onPressed: _showAddSheet)]),
+      appBar: AppBar(title: const Text('Net Worth'), actions: [
+        IconButton(icon: const Icon(Icons.add), onPressed: _showAddSheet)
+      ]),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -59,20 +72,37 @@ class _NetWorthScreenState extends ConsumerState<NetWorthScreen> {
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: _netWorth >= 0 ? [AppColors.income, const Color(0xFF00A878)] : [AppColors.expense, const Color(0xFFD32F2F)],
+                        colors: _netWorth >= 0
+                            ? [AppColors.income, const Color(0xFF00A878)]
+                            : [AppColors.expense, const Color(0xFFD32F2F)],
                       ),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Column(children: [
-                      const Text('Net Worth', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      const Text('Net Worth',
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 14)),
                       const SizedBox(height: 8),
-                      Text(CurrencyFormatter.format(_netWorth), style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w700)),
+                      Text(CurrencyFormatter.format(_netWorth),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w700)),
                       const SizedBox(height: 12),
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                        _NWStatChip(label: 'Assets', value: _totalAssets, color: Colors.white),
-                        Container(width: 1, height: 30, color: Colors.white30),
-                        _NWStatChip(label: 'Liabilities', value: _totalLiabilities, color: Colors.white),
-                      ]),
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _NWStatChip(
+                                label: 'Assets',
+                                value: _totalAssets,
+                                color: Colors.white),
+                            Container(
+                                width: 1, height: 30, color: Colors.white30),
+                            _NWStatChip(
+                                label: 'Liabilities',
+                                value: _totalLiabilities,
+                                color: Colors.white),
+                          ]),
                     ]),
                   ).animate().fadeIn(),
                   const SizedBox(height: 20),
@@ -89,7 +119,8 @@ class _NetWorthScreenState extends ConsumerState<NetWorthScreen> {
     );
   }
 
-  Widget _buildSection(String title, List<NetWorthEntry> entries, {required bool isAsset}) {
+  Widget _buildSection(String title, List<NetWorthEntry> entries,
+      {required bool isAsset}) {
     final subTypes = <String, List<NetWorthEntry>>{};
     for (final e in entries) {
       subTypes.putIfAbsent(e.subType, () => []).add(e);
@@ -98,54 +129,94 @@ class _NetWorthScreenState extends ConsumerState<NetWorthScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          Text(CurrencyFormatter.formatCompact(isAsset ? _totalAssets : _totalLiabilities),
-              style: TextStyle(fontWeight: FontWeight.w700, color: isAsset ? AppColors.income : AppColors.expense)),
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(
+              CurrencyFormatter.formatCompact(
+                  isAsset ? _totalAssets : _totalLiabilities),
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: isAsset ? AppColors.income : AppColors.expense)),
         ]),
         const SizedBox(height: 10),
         if (entries.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.grey.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-            child: Center(child: Text('No ${isAsset ? 'assets' : 'liabilities'} added', style: const TextStyle(color: AppColors.lightTextSecondary))),
+            decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12)),
+            child: Center(
+                child: Text('No ${isAsset ? 'assets' : 'liabilities'} added',
+                    style:
+                        const TextStyle(color: AppColors.lightTextSecondary))),
           )
         else
           ...entries.asMap().entries.map((e) => Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: Text(_subTypeEmoji(e.value.subType), style: const TextStyle(fontSize: 24)),
-              title: Text(e.value.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(e.value.subType),
-              trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(CurrencyFormatter.formatCompact(e.value.amount),
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: isAsset ? AppColors.income : AppColors.expense)),
-                TextButton(
-                  onPressed: () => _showUpdateSheet(e.value),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 20)),
-                  child: const Text('Update', style: TextStyle(fontSize: 11)),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: Text(_subTypeEmoji(e.value.subType),
+                      style: const TextStyle(fontSize: 24)),
+                  title: Text(e.value.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(e.value.subType),
+                  trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(CurrencyFormatter.formatCompact(e.value.amount),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: isAsset
+                                    ? AppColors.income
+                                    : AppColors.expense)),
+                        TextButton(
+                          onPressed: () => _showUpdateSheet(e.value),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 20)),
+                          child: const Text('Update',
+                              style: TextStyle(fontSize: 11)),
+                        ),
+                      ]),
+                  onTap: () => _showUpdateSheet(e.value),
                 ),
-              ]),
-              onTap: () => _showUpdateSheet(e.value),
-            ),
-          ).animate().fadeIn(delay: (e.key * 40).ms)),
+              ).animate().fadeIn(delay: (e.key * 40).ms)),
       ],
     );
   }
 
   String _subTypeEmoji(String type) {
-    const map = {'Bank': '🏦', 'FD': '🏛', 'MF': '📊', 'Stocks': '📈', 'Gold': '🥇',
-      'Real Estate': '🏠', 'Cash': '💵', 'Loan': '🏠', 'Credit Card': '💳', 'Other': '💼'};
+    const map = {
+      'Bank': '🏦',
+      'FD': '🏛',
+      'MF': '📊',
+      'Stocks': '📈',
+      'Gold': '🥇',
+      'Real Estate': '🏠',
+      'Cash': '💵',
+      'Loan': '🏠',
+      'Credit Card': '💳',
+      'Other': '💼'
+    };
     return map[type] ?? '💰';
   }
 
   void _showAddSheet() {
-    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (_) => _NWEntrySheet(onSaved: _load));
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _NWEntrySheet(onSaved: _load));
   }
 
   void _showUpdateSheet(NetWorthEntry entry) {
-    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (_) => _NWEntrySheet(existing: entry, onSaved: _load));
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _NWEntrySheet(existing: entry, onSaved: _load));
   }
 }
 
@@ -153,13 +224,17 @@ class _NWStatChip extends StatelessWidget {
   final String label;
   final double value;
   final Color color;
-  const _NWStatChip({required this.label, required this.value, required this.color});
+  const _NWStatChip(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) => Column(children: [
-    Text(label, style: TextStyle(color: color.withOpacity(0.7), fontSize: 12)),
-    Text(CurrencyFormatter.formatCompact(value), style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 16)),
-  ]);
+        Text(label,
+            style: TextStyle(color: color.withOpacity(0.7), fontSize: 12)),
+        Text(CurrencyFormatter.formatCompact(value),
+            style: TextStyle(
+                color: color, fontWeight: FontWeight.w700, fontSize: 16)),
+      ]);
 }
 
 class _NWEntrySheet extends StatefulWidget {
@@ -177,7 +252,16 @@ class _NWEntrySheetState extends State<_NWEntrySheet> {
   String _subType = 'Bank';
   bool _saving = false;
 
-  static const _assetSubTypes = ['Bank', 'FD', 'MF', 'Stocks', 'Gold', 'Real Estate', 'Cash', 'Other'];
+  static const _assetSubTypes = [
+    'Bank',
+    'FD',
+    'MF',
+    'Stocks',
+    'Gold',
+    'Real Estate',
+    'Cash',
+    'Other'
+  ];
   static const _liabilitySubTypes = ['Loan', 'Credit Card', 'Other'];
 
   @override
@@ -192,39 +276,81 @@ class _NWEntrySheetState extends State<_NWEntrySheet> {
   }
 
   @override
-  void dispose() { _nameCtrl.dispose(); _amountCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _nameCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final subTypes = _type == 'ASSET' ? _assetSubTypes : _liabilitySubTypes;
     return Container(
-      decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 24),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
-        const SizedBox(height: 16),
-        Text(widget.existing == null ? 'Add Entry' : 'Update Entry', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 16),
-        SegmentedButton<String>(
-          segments: const [ButtonSegment(value: 'ASSET', label: Text('Asset')), ButtonSegment(value: 'LIABILITY', label: Text('Liability'))],
-          selected: {_type},
-          onSelectionChanged: (s) => setState(() { _type = s.first; _subType = (_type == 'ASSET' ? _assetSubTypes : _liabilitySubTypes).first; }),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          value: subTypes.contains(_subType) ? _subType : subTypes.first,
-          decoration: const InputDecoration(labelText: 'Type'),
-          items: subTypes.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-          onChanged: (v) => setState(() => _subType = v!),
-        ),
-        const SizedBox(height: 12),
-        TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Name (e.g. SBI FD, Zerodha)')),
-        const SizedBox(height: 12),
-        TextField(controller: _amountCtrl, decoration: const InputDecoration(labelText: 'Current Value', prefixText: '₹ '), keyboardType: TextInputType.number),
-        const SizedBox(height: 20),
-        SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _saving ? null : _save,
-            child: Text(widget.existing == null ? 'Add' : 'Update'))),
-      ]),
+      decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+      padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            Text(widget.existing == null ? 'Add Entry' : 'Update Entry',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'ASSET', label: Text('Asset')),
+                ButtonSegment(value: 'LIABILITY', label: Text('Liability'))
+              ],
+              selected: {_type},
+              onSelectionChanged: (s) => setState(() {
+                _type = s.first;
+                _subType =
+                    (_type == 'ASSET' ? _assetSubTypes : _liabilitySubTypes)
+                        .first;
+              }),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue:
+                  subTypes.contains(_subType) ? _subType : subTypes.first,
+              decoration: const InputDecoration(labelText: 'Type'),
+              items: subTypes
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (v) => setState(() => _subType = v!),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Name (e.g. SBI FD, Zerodha)')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _amountCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Current Value', prefixText: '₹ '),
+                keyboardType: TextInputType.number),
+            const SizedBox(height: 20),
+            SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    child: Text(widget.existing == null ? 'Add' : 'Update'))),
+          ]),
     );
   }
 
@@ -233,7 +359,8 @@ class _NWEntrySheetState extends State<_NWEntrySheet> {
     setState(() => _saving = true);
     await DatabaseHelper.instance.insert('net_worth_entries', {
       'id': const Uuid().v4(),
-      'entry_type': _type, 'sub_type': _subType,
+      'entry_type': _type,
+      'sub_type': _subType,
       'name': _nameCtrl.text.trim(),
       'amount': double.tryParse(_amountCtrl.text) ?? 0,
       'date': DateTime.now().millisecondsSinceEpoch,

@@ -6,6 +6,7 @@ import '../../core/models/transaction_model.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'add_transaction_screen.dart';
+import '../../core/providers/refresh_provider.dart';
 
 class TransactionListScreen extends ConsumerStatefulWidget {
   const TransactionListScreen({super.key});
@@ -92,6 +93,9 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(transactionUpdateProvider, (previous, next) {
+      _load();
+    });
     final grouped = _grouped;
     final keys = grouped.keys.toList();
 
@@ -210,12 +214,14 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                                 ),
                                 onDismissed: (_) async {
                                   await DatabaseHelper.instance.delete('transactions', where: 'id = ?', whereArgs: [e.value.id]);
+                                  ref.read(transactionUpdateProvider.notifier).state++;
                                   _load();
                                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: const Text('Transaction deleted'),
                                       action: SnackBarAction(label: 'Undo', onPressed: () async {
                                         await DatabaseHelper.instance.insert('transactions', e.value.toMap());
+                                        ref.read(transactionUpdateProvider.notifier).state++;
                                         _load();
                                       }),
                                     ),

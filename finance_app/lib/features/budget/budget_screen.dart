@@ -8,6 +8,7 @@ import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/services/ai_service.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/providers/refresh_provider.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -52,10 +53,18 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         _prediction = null;
       });
 
-      if (_selectedMonth.month == DateTime.now().month && _selectedMonth.year == DateTime.now().year && _totalBudget > 0) {
+      if (_selectedMonth.month == DateTime.now().month &&
+          _selectedMonth.year == DateTime.now().year &&
+          _totalBudget > 0) {
         setState(() => _loadingPrediction = true);
-        final res = await ref.read(aiServiceProvider).getPredictiveBudget(_totalBudget, _totalSpent);
-        if (mounted) setState(() { _prediction = res; _loadingPrediction = false; });
+        final res = await ref
+            .read(aiServiceProvider)
+            .getPredictiveBudget(_totalBudget, _totalSpent);
+        if (mounted)
+          setState(() {
+            _prediction = res;
+            _loadingPrediction = false;
+          });
       }
     }
   }
@@ -65,10 +74,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(transactionUpdateProvider, (previous, next) {
+      _load();
+    });
     return Scaffold(
       appBar: AppBar(
         title: const Text('Budget'),
-        actions: [IconButton(icon: const Icon(Icons.add), onPressed: _showAddBudgetSheet)],
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.add), onPressed: _showAddBudgetSheet)
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -88,15 +103,22 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.income.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.income.withOpacity(0.3)),
+                          border: Border.all(
+                              color: AppColors.income.withOpacity(0.3)),
                         ),
                         child: Row(children: [
-                          const Icon(Icons.auto_awesome, color: AppColors.income, size: 20),
+                          const Icon(Icons.auto_awesome,
+                              color: AppColors.income, size: 20),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _loadingPrediction 
-                                ? const Text('AI is analyzing your spending pace...', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic))
-                                : Text(_prediction!, style: const TextStyle(fontSize: 12)),
+                            child: _loadingPrediction
+                                ? const Text(
+                                    'AI is analyzing your spending pace...',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontStyle: FontStyle.italic))
+                                : Text(_prediction!,
+                                    style: const TextStyle(fontSize: 12)),
                           ),
                         ]),
                       ),
@@ -105,7 +127,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     _buildPieChart(),
                     const SizedBox(height: 20),
                   ],
-                  const Text('Category Budgets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const Text('Category Budgets',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   if (_budgets.isEmpty)
                     Center(
@@ -114,16 +138,22 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           const SizedBox(height: 40),
                           const Text('🎯', style: TextStyle(fontSize: 48)),
                           const SizedBox(height: 12),
-                          const Text('No budgets set', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          const Text('No budgets set',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
-                          const Text('Tap + to add a budget for a category', style: TextStyle(color: AppColors.lightTextSecondary)),
+                          const Text('Tap + to add a budget for a category',
+                              style: TextStyle(
+                                  color: AppColors.lightTextSecondary)),
                         ],
                       ),
                     )
                   else
-                    ..._budgets.asMap().entries.map((e) =>
-                      _BudgetProgressCard(budget: e.value, onEdit: () => _showEditSheet(e.value))
-                        .animate().fadeIn(delay: (e.key * 60).ms)),
+                    ..._budgets.asMap().entries.map((e) => _BudgetProgressCard(
+                            budget: e.value,
+                            onEdit: () => _showEditSheet(e.value))
+                        .animate()
+                        .fadeIn(delay: (e.key * 60).ms)),
                 ],
               ),
             ),
@@ -137,7 +167,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         IconButton(
           icon: const Icon(Icons.chevron_left),
           onPressed: () {
-            setState(() => _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1));
+            setState(() => _selectedMonth =
+                DateTime(_selectedMonth.year, _selectedMonth.month - 1));
             _load();
           },
         ),
@@ -146,7 +177,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         IconButton(
           icon: const Icon(Icons.chevron_right),
           onPressed: () {
-            setState(() => _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1));
+            setState(() => _selectedMonth =
+                DateTime(_selectedMonth.year, _selectedMonth.month + 1));
             _load();
           },
         ),
@@ -155,8 +187,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   }
 
   Widget _buildSummaryCard() {
-    final usagePct = _totalBudget > 0 ? (_totalSpent / _totalBudget).clamp(0.0, 1.0) : 0.0;
-    final color = usagePct < 0.8 ? AppColors.income : usagePct < 1.0 ? AppColors.warning : AppColors.expense;
+    final usagePct =
+        _totalBudget > 0 ? (_totalSpent / _totalBudget).clamp(0.0, 1.0) : 0.0;
+    final color = usagePct < 0.8
+        ? AppColors.income
+        : usagePct < 1.0
+            ? AppColors.warning
+            : AppColors.expense;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -169,13 +206,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total Budget', style: TextStyle(color: Colors.white70, fontSize: 13)),
-              Text('${(usagePct * 100).toInt()}% used', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              const Text('Total Budget',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+              Text('${(usagePct * 100).toInt()}% used',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 8),
-          Text(CurrencyFormatter.format(_totalSpent), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
-          Text('of ${CurrencyFormatter.format(_totalBudget)}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          Text(CurrencyFormatter.format(_totalSpent),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700)),
+          Text('of ${CurrencyFormatter.format(_totalBudget)}',
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
@@ -197,13 +242,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       height: 200,
       child: PieChart(PieChartData(
         sections: _budgets.map((b) {
-          final color = b.categoryColor != null ? Color(b.categoryColor!) : AppColors.primary;
+          final color = b.categoryColor != null
+              ? Color(b.categoryColor!)
+              : AppColors.primary;
           return PieChartSectionData(
             value: b.spent ?? 0,
             color: color,
             title: b.categoryName ?? '',
             radius: 70,
-            titleStyle: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600),
+            titleStyle: const TextStyle(
+                fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600),
           );
         }).toList(),
         centerSpaceRadius: 40,
@@ -226,7 +274,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _BudgetFormSheet(month: _selectedMonth, existing: budget, onSaved: _load),
+      builder: (_) => _BudgetFormSheet(
+          month: _selectedMonth, existing: budget, onSaved: _load),
     );
   }
 }
@@ -239,8 +288,14 @@ class _BudgetProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usage = budget.usagePercent.clamp(0.0, 1.0);
-    final color = usage < 0.8 ? AppColors.income : usage < 1.0 ? AppColors.warning : AppColors.expense;
-    final catColor = budget.categoryColor != null ? Color(budget.categoryColor!) : AppColors.primary;
+    final color = usage < 0.8
+        ? AppColors.income
+        : usage < 1.0
+            ? AppColors.warning
+            : AppColors.expense;
+    final catColor = budget.categoryColor != null
+        ? Color(budget.categoryColor!)
+        : AppColors.primary;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -251,16 +306,22 @@ class _BudgetProgressCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: catColor.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                  child: Center(child: Text(_emoji(budget.categoryIcon ?? ''), style: const TextStyle(fontSize: 20))),
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: catColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Center(
+                      child: Text(_emoji(budget.categoryIcon ?? ''),
+                          style: const TextStyle(fontSize: 20))),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(budget.categoryName ?? 'Category', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(budget.categoryName ?? 'Category',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
                       Text(
                         '${CurrencyFormatter.formatCompact(budget.spent ?? 0)} / ${CurrencyFormatter.formatCompact(budget.amount)}',
                         style: TextStyle(fontSize: 12, color: color),
@@ -268,7 +329,9 @@ class _BudgetProgressCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: onEdit),
+                IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: onEdit),
               ],
             ),
             const SizedBox(height: 10),
@@ -285,11 +348,16 @@ class _BudgetProgressCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${(usage * 100).toInt()}% used', style: TextStyle(fontSize: 11, color: color)),
-                Text(budget.remaining >= 0
-                    ? '${CurrencyFormatter.formatCompact(budget.remaining)} left'
-                    : '${CurrencyFormatter.formatCompact(budget.remaining.abs())} over',
-                    style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+                Text('${(usage * 100).toInt()}% used',
+                    style: TextStyle(fontSize: 11, color: color)),
+                Text(
+                    budget.remaining >= 0
+                        ? '${CurrencyFormatter.formatCompact(budget.remaining)} left'
+                        : '${CurrencyFormatter.formatCompact(budget.remaining.abs())} over',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: color,
+                        fontWeight: FontWeight.w600)),
               ],
             ),
           ],
@@ -299,8 +367,18 @@ class _BudgetProgressCard extends StatelessWidget {
   }
 
   String _emoji(String icon) {
-    const map = {'food': '🍕', 'cart': '🛒', 'car': '🚗', 'bag': '🛍️', 'tv': '🎬',
-      'heart': '💊', 'flash': '⚡', 'mobile': '📱', 'book': '🎓', 'refresh': '🔄'};
+    const map = {
+      'food': '🍕',
+      'cart': '🛒',
+      'car': '🚗',
+      'bag': '🛍️',
+      'tv': '🎬',
+      'heart': '💊',
+      'flash': '⚡',
+      'mobile': '📱',
+      'book': '🎓',
+      'refresh': '🔄'
+    };
     return map[icon] ?? '💸';
   }
 }
@@ -309,7 +387,8 @@ class _BudgetFormSheet extends StatefulWidget {
   final DateTime month;
   final BudgetModel? existing;
   final VoidCallback onSaved;
-  const _BudgetFormSheet({required this.month, this.existing, required this.onSaved});
+  const _BudgetFormSheet(
+      {required this.month, this.existing, required this.onSaved});
 
   @override
   State<_BudgetFormSheet> createState() => _BudgetFormSheetState();
@@ -332,34 +411,60 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
   }
 
   Future<void> _loadCategories() async {
-    final rows = await DatabaseHelper.instance.query('categories', where: 'type = ?', whereArgs: ['EXPENSE'], orderBy: 'name');
-    if (mounted) setState(() => _categories = rows.map(CategoryModel.fromMap).toList());
+    final rows = await DatabaseHelper.instance.query('categories',
+        where: 'type = ?', whereArgs: ['EXPENSE'], orderBy: 'name');
+    if (mounted)
+      setState(() => _categories = rows.map(CategoryModel.fromMap).toList());
   }
 
   @override
-  void dispose() { _amountCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+      decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+      padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+          Center(
+              child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
-          Text(widget.existing == null ? 'Set Budget' : 'Edit Budget', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(widget.existing == null ? 'Set Budget' : 'Edit Budget',
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _selectedCategoryId,
-            decoration: const InputDecoration(labelText: 'Category', prefixIcon: Icon(Icons.category)),
-            items: _categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+            initialValue: _selectedCategoryId,
+            decoration: const InputDecoration(
+                labelText: 'Category', prefixIcon: Icon(Icons.category)),
+            items: _categories
+                .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                .toList(),
             onChanged: (v) => setState(() => _selectedCategoryId = v),
           ),
           const SizedBox(height: 12),
-          TextField(controller: _amountCtrl, decoration: const InputDecoration(labelText: 'Monthly Budget', prefixText: '₹ '), keyboardType: TextInputType.number),
+          TextField(
+              controller: _amountCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Monthly Budget', prefixText: '₹ '),
+              keyboardType: TextInputType.number),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -380,7 +485,8 @@ class _BudgetFormSheetState extends State<_BudgetFormSheet> {
     await db.insert('budgets', {
       'id': widget.existing?.id ?? const Uuid().v4(),
       'category_id': _selectedCategoryId,
-      'month': widget.month.month, 'year': widget.month.year,
+      'month': widget.month.month,
+      'year': widget.month.year,
       'amount': double.tryParse(_amountCtrl.text) ?? 0,
     });
     widget.onSaved();
