@@ -20,6 +20,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _balanceVisible = true;
   List<AccountModel> _accounts = [];
   List<TransactionModel> _recentTx = [];
+  List<SubscriptionModel> _upcomingSubs = [];
   double _monthIncome = 0;
   double _monthExpense = 0;
   bool _loading = true;
@@ -55,10 +56,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (row['type'] == 'EXPENSE') expense = (row['total'] as num).toDouble();
     }
 
+    // Load upcoming subscriptions within 5 days limit
+    final subMaps = await db.query('subscriptions');
+    final allSubs = subMaps.map(SubscriptionModel.fromMap).toList();
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final upcoming = allSubs.where((s) {
+      final billingMidnight = DateTime(s.nextBillingDate.year, s.nextBillingDate.month, s.nextBillingDate.day);
+      final days = billingMidnight.difference(todayMidnight).inDays;
+      return days >= 0 && days <= 5;
+    }).toList();
+
+    upcoming.sort((a, b) {
+      final billingMidnightA = DateTime(a.nextBillingDate.year, a.nextBillingDate.month, a.nextBillingDate.day);
+      final billingMidnightB = DateTime(b.nextBillingDate.year, b.nextBillingDate.month, b.nextBillingDate.day);
+      return billingMidnightA.difference(todayMidnight).inDays.compareTo(
+        billingMidnightB.difference(todayMidnight).inDays
+      );
+    });
+
     if (mounted) {
       setState(() {
         _accounts = accountMaps.map(AccountModel.fromMap).toList();
         _recentTx = txMaps.map(TransactionModel.fromMap).toList();
+        _upcomingSubs = upcoming;
         _monthIncome = income;
         _monthExpense = expense;
         _loading = false;
@@ -85,6 +105,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             else ...[
               SliverToBoxAdapter(child: _buildBalanceCard()),
               SliverToBoxAdapter(child: _buildIncomeExpenseRow()),
+              SliverToBoxAdapter(child: _buildUpcomingSubsAlerts()),
               const SliverToBoxAdapter(child: InsightsCarousel()),
               SliverToBoxAdapter(child: _buildQuickActions()),
               SliverToBoxAdapter(child: _buildMonthlyChart()),
@@ -196,6 +217,92 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ],
       ),
     ).animate().fadeIn(delay: 100.ms);
+  }
+
+  Widget _buildUpcomingSubsAlerts() {
+    if (_upcomingSubs.isEmpty) return const SizedBox.shrink();
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.notification_important_rounded, color: AppColors.expense, size: 18),
+              SizedBox(width: 6),
+              Text(
+                'Action Required',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.expense),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ..._upcomingSubs.map((sub) {
+            final billingMidnight = DateTime(sub.nextBillingDate.year, sub.nextBillingDate.month, sub.nextBillingDate.day);
+            final today = DateTime.now();
+            final todayMidnight = DateTime(today.year, today.month, today.day);
+            final days = billingMidnight.difference(todayMidnight).inDays;
+
+            final String daysText = days == 0
+                ? 'billing today'
+                : days == 1
+                    ? '1 day left'
+                    : '$days days left';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.expense.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.expense.withOpacity(0.25)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    sub.icon,
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sub.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          '₹${sub.amount.toStringAsFixed(0)} • $daysText',
+                          style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/subscriptions');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.expense,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Pay Now', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    ).animate().fadeIn(delay: 150.ms);
   }
 
   Widget _buildQuickActions() {
