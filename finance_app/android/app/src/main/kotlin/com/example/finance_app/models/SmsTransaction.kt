@@ -15,7 +15,9 @@ data class SmsTransaction(
     val smsRaw: String,
     val sender: String,
     val timestamp: Long,
-    val upiRef: String?
+    val upiRef: String?,
+    val isCreditCard: Boolean,
+    val cardName: String?
 ) {
     fun toMap(): Map<String, Any?> {
         return mapOf(
@@ -29,7 +31,9 @@ data class SmsTransaction(
             "smsRaw" to smsRaw,
             "sender" to sender,
             "timestamp" to timestamp,
-            "upiRef" to upiRef
+            "upiRef" to upiRef,
+            "isCreditCard" to if (isCreditCard) 1 else 0,
+            "cardName" to cardName
         )
     }
 }

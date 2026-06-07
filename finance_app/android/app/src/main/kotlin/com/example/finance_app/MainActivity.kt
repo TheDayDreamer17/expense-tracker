@@ -2,6 +2,8 @@ package com.example.finance_app
 
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import com.example.finance_app.db.AppDatabase
 import com.example.finance_app.models.SmsTransaction
@@ -22,10 +24,32 @@ class MainActivity : FlutterActivity() {
 
     private var eventSink: EventChannel.EventSink? = null
     private var launchTransaction: Map<String, Any?>? = null
+    private var smsReceiver: SmsReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        smsReceiver = SmsReceiver()
+        val filter = IntentFilter("android.provider.Telephony.SMS_RECEIVED").apply {
+            priority = 999
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(smsReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(smsReceiver, filter)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        smsReceiver?.let {
+            unregisterReceiver(it)
+            smsReceiver = null
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -47,6 +71,8 @@ class MainActivity : FlutterActivity() {
                 "accountLast4" to intent.getStringExtra("accountLast4"),
                 "balance" to if (intent.hasExtra("balance")) intent.getDoubleExtra("balance", 0.0) else null,
                 "upiRef" to intent.getStringExtra("upiRef"),
+                "isCreditCard" to intent.getBooleanExtra("isCreditCard", false),
+                "cardName" to intent.getStringExtra("cardName"),
                 "timestamp" to System.currentTimeMillis()
             )
 

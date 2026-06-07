@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Telephony
 import androidx.core.app.NotificationCompat
+import android.util.Log
 import com.example.finance_app.MainActivity
 import com.example.finance_app.db.AppDatabase
 import com.example.finance_app.models.SmsTransaction
@@ -27,15 +28,25 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d("SmsReceiver", "onReceive triggered with action: " + intent.action)
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            if (messages.isNullOrEmpty()) return
+            if (messages.isNullOrEmpty()) {
+                Log.d("SmsReceiver", "No messages parsed from intent")
+                return
+            }
 
             val sender = messages[0].displayOriginatingAddress ?: ""
             val timestamp = messages[0].timestampMillis
             val body = messages.joinToString("") { it.displayMessageBody ?: "" }
+            Log.d("SmsReceiver", "Received SMS from: " + sender + ", body: " + body)
 
-            val parsed = SmsParser.parse(sender, body, timestamp) ?: return
+            val parsed = SmsParser.parse(sender, body, timestamp)
+            if (parsed == null) {
+                Log.d("SmsReceiver", "Failed to parse transaction from SMS")
+                return
+            }
+            Log.d("SmsReceiver", "Parsed transaction: amount=" + parsed.amount + ", type=" + parsed.type + ", isCreditCard=" + parsed.isCreditCard + ", cardName=" + parsed.cardName)
 
             // Run database insert on a background coroutine
             CoroutineScope(Dispatchers.IO).launch {
@@ -84,6 +95,8 @@ class SmsReceiver : BroadcastReceiver() {
             putExtra("accountLast4", tx.accountLast4)
             if (tx.balance != null) putExtra("balance", tx.balance)
             if (tx.upiRef != null) putExtra("upiRef", tx.upiRef)
+            putExtra("isCreditCard", tx.isCreditCard)
+            if (tx.cardName != null) putExtra("cardName", tx.cardName)
         }
 
         val pendingIntent = PendingIntent.getActivity(

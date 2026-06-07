@@ -63,6 +63,26 @@ object SmsParser {
         // Unique ID from hash of body + timestamp to differentiate separate transactions with identical bodies
         val id = hashString("$body|$timestamp")
 
+        val lowerBody = body.lowercase()
+        val lowerSender = sender.lowercase()
+        val isCreditCard = lowerBody.contains("credit card") ||
+                lowerBody.contains("spent on card") ||
+                lowerBody.contains("card ending") ||
+                lowerSender.contains("card") ||
+                lowerSender.contains("crd") ||
+                (lowerBody.contains("card") && isDebit)
+
+        var cardName: String? = null
+        if (isCreditCard) {
+            cardName = when {
+                lowerSender.contains("sbi") || lowerBody.contains("sbi card") || lowerBody.contains("sbicard") -> "SBI Card"
+                lowerSender.contains("hdfc") || lowerBody.contains("hdfc card") -> "HDFC Card"
+                lowerSender.contains("icici") || lowerBody.contains("icici card") -> "ICICI Card"
+                lowerSender.contains("axis") || lowerBody.contains("axis card") -> "Axis Card"
+                else -> "Credit Card"
+            }
+        }
+
         return SmsTransaction(
             id = id,
             amount = amount,
@@ -74,7 +94,9 @@ object SmsParser {
             smsRaw = body,
             sender = sender,
             timestamp = timestamp,
-            upiRef = upiRef
+            upiRef = upiRef,
+            isCreditCard = isCreditCard,
+            cardName = cardName
         )
     }
 
