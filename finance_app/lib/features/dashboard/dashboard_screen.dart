@@ -7,7 +7,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/db/database_helper.dart';
 import '../../core/models/models.dart';
 import '../../core/models/transaction_model.dart';
-import '../../widgets/shared/monthly_summary_card.dart';
+import '../../widgets/shared/insights_carousel.dart';
 import '../../core/providers/refresh_provider.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -85,7 +85,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             else ...[
               SliverToBoxAdapter(child: _buildBalanceCard()),
               SliverToBoxAdapter(child: _buildIncomeExpenseRow()),
-              const SliverToBoxAdapter(child: MonthlySummaryCard()),
+              const SliverToBoxAdapter(child: InsightsCarousel()),
               SliverToBoxAdapter(child: _buildQuickActions()),
               SliverToBoxAdapter(child: _buildMonthlyChart()),
               SliverToBoxAdapter(child: _buildAccountsRow()),
@@ -432,7 +432,7 @@ class _TxListItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(child: Text(
-          _categoryEmoji(tx.categoryId ?? ''),
+          _categoryEmoji(tx.categoryId ?? '', tx.categoryIcon),
           style: const TextStyle(fontSize: 20),
         )),
       ),
@@ -449,7 +449,8 @@ class _TxListItem extends StatelessWidget {
     );
   }
 
-  String _categoryEmoji(String id) {
+  String _categoryEmoji(String id, String? customIcon) {
+    if (customIcon != null && customIcon.isNotEmpty) return customIcon;
     const map = {
       'cat_food': '🍕', 'cat_grocery': '🛒', 'cat_transport': '🚗',
       'cat_shopping': '🛍️', 'cat_entertainment': '🎬', 'cat_health': '💊',
