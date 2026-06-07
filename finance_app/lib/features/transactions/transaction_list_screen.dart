@@ -298,7 +298,7 @@ class _TxTile extends StatelessWidget {
           color: (tx.categoryColor != null ? Color(tx.categoryColor!) : AppColors.primary).withOpacity(0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Center(child: Text(_emoji(tx.categoryId ?? ''), style: const TextStyle(fontSize: 20))),
+        child: Center(child: Text(_emoji(tx.categoryId ?? '', tx.categoryIcon), style: const TextStyle(fontSize: 20))),
       ),
       title: Text(tx.categoryName ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(
@@ -316,7 +316,8 @@ class _TxTile extends StatelessWidget {
     );
   }
 
-  String _emoji(String id) {
+  String _emoji(String id, String? customIcon) {
+    if (customIcon != null && customIcon.isNotEmpty) return customIcon;
     const map = {'cat_food':'🍕','cat_grocery':'🛒','cat_transport':'🚗','cat_shopping':'🛍️',
       'cat_entertainment':'🎬','cat_health':'💊','cat_utilities':'⚡','cat_telecom':'📱',
       'cat_education':'🎓','cat_subscription':'🔄','cat_salary':'💰','cat_freelance':'💻',

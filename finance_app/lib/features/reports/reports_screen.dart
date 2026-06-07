@@ -20,6 +20,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
   DateTime _selectedMonth = DateTime.now();
   List<TransactionModel> _transactions = [];
   bool _loading = true;
+  String _categoriesSubTab = 'CATEGORIES'; // 'CATEGORIES' | 'MERCHANTS'
 
   @override
   void initState() {
@@ -73,10 +74,38 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
         map.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
   }
 
+  Map<String, double> get _expenseByMerchant {
+    final map = <String, double>{};
+    for (final t in _expenses) {
+      final key = t.note?.trim() ?? '';
+      if (key.isNotEmpty) {
+        map[key] = (map[key] ?? 0) + t.amount;
+      }
+    }
+    return Map.fromEntries(
+        map.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
+  }
+
+  double get _totalMerchantExpense {
+    return _expenseByMerchant.values.fold(0.0, (sum, val) => sum + val);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(transactionUpdateProvider, (previous, next) {
       _load();
+    });
+    ref.listen<String>(reportsSubTabProvider, (previous, next) {
+      if (mounted) {
+        setState(() {
+          if (next == 'OVERVIEW') {
+            _tab.index = 0;
+          } else {
+            _categoriesSubTab = next;
+            _tab.index = 1;
+          }
+        });
+      }
     });
     return Scaffold(
       appBar: AppBar(
@@ -244,12 +273,55 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
   }
 
   Widget _buildCategories() {
-    final byCategory = _expenseByCategory;
-    if (byCategory.isEmpty) {
-      return const Center(child: Text('No expense data this month'));
-    }
     return ListView(
       padding: const EdgeInsets.all(16),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'CATEGORIES',
+                label: Text('Categories'),
+                icon: Icon(Icons.category_outlined),
+              ),
+              ButtonSegment(
+                value: 'MERCHANTS',
+                label: Text('Merchants'),
+                icon: Icon(Icons.storefront_outlined),
+              ),
+            ],
+            selected: {_categoriesSubTab},
+            onSelectionChanged: (set) {
+              setState(() {
+                _categoriesSubTab = set.first;
+              });
+            },
+            showSelectedIcon: false,
+            style: SegmentedButton.styleFrom(
+              selectedBackgroundColor: AppColors.primary.withOpacity(0.15),
+              selectedForegroundColor: AppColors.primary,
+            ),
+          ),
+        ),
+        if (_categoriesSubTab == 'CATEGORIES') ...[
+          _buildCategoriesContent()
+        ] else ...[
+          _buildMerchantsContent()
+        ]
+      ],
+    );
+  }
+
+  Widget _buildCategoriesContent() {
+    final byCategory = _expenseByCategory;
+    if (byCategory.isEmpty) {
+      return const SizedBox(
+        height: 300,
+        child: Center(child: Text('No expense data this month')),
+      );
+    }
+    return Column(
       children: [
         SizedBox(
           height: 240,
@@ -308,6 +380,108 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
                       backgroundColor: AppColors.primary.withOpacity(0.1),
                       valueColor:
                           const AlwaysStoppedAnimation(AppColors.primary),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              )),
+            ]),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildMerchantsContent() {
+    final byMerchant = _expenseByMerchant;
+    if (byMerchant.isEmpty) {
+      return const SizedBox(
+        height: 300,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.storefront, color: Colors.grey, size: 40),
+              SizedBox(height: 8),
+              Text('No merchant expense data this month', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            ],
+          ),
+        ),
+      );
+    }
+    final totalMerchant = _totalMerchantExpense;
+    return Column(
+      children: [
+        SizedBox(
+          height: 240,
+          child: PieChart(PieChartData(
+            sections: byMerchant.entries.map((e) {
+              final colors = [
+                Colors.teal.shade400,
+                Colors.indigo.shade400,
+                Colors.orange.shade400,
+                Colors.pink.shade400,
+                Colors.purple.shade400,
+                Colors.amber.shade400,
+                Colors.cyan.shade400,
+                Colors.blue.shade400,
+              ];
+              final idx =
+                  byMerchant.keys.toList().indexOf(e.key) % colors.length;
+              return PieChartSectionData(
+                value: e.value,
+                color: colors[idx],
+                title: '${(e.value / totalMerchant * 100).toInt()}%',
+                radius: 80,
+                titleStyle: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700),
+              );
+            }).toList(),
+            centerSpaceRadius: 40,
+            sectionsSpace: 2,
+          )),
+        ),
+        const SizedBox(height: 16),
+        ...byMerchant.entries.map((e) {
+          final pct = totalMerchant > 0 ? e.value / totalMerchant : 0.0;
+          final colors = [
+            Colors.teal.shade400,
+            Colors.indigo.shade400,
+            Colors.orange.shade400,
+            Colors.pink.shade400,
+            Colors.purple.shade400,
+            Colors.amber.shade400,
+            Colors.cyan.shade400,
+            Colors.blue.shade400,
+          ];
+          final color = colors[byMerchant.keys.toList().indexOf(e.key) % colors.length];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(children: [
+              Expanded(
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(e.key,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500, fontSize: 13)),
+                        Text(CurrencyFormatter.formatCompact(e.value),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 13)),
+                      ]),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: pct.toDouble(),
+                      backgroundColor: color.withOpacity(0.1),
+                      valueColor: AlwaysStoppedAnimation(color),
                       minHeight: 6,
                     ),
                   ),
