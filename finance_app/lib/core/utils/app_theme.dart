@@ -52,7 +52,6 @@ class AppTheme {
         seedColor: AppColors.primary,
         brightness: Brightness.light,
         surface: AppColors.lightSurface,
-        background: AppColors.lightBg,
       ),
       scaffoldBackgroundColor: AppColors.lightBg,
       textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
@@ -66,7 +65,7 @@ class AppTheme {
         bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.lightTextSecondary),
         labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.lightTextPrimary),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.lightCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -129,7 +128,6 @@ class AppTheme {
         seedColor: AppColors.primary,
         brightness: Brightness.dark,
         surface: AppColors.darkSurface,
-        background: AppColors.darkBg,
       ),
       scaffoldBackgroundColor: AppColors.darkBg,
       textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
@@ -143,7 +141,7 @@ class AppTheme {
         bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.darkTextSecondary),
         labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.darkTextPrimary),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.darkCard,
         elevation: 0,
         shape: RoundedRectangleBorder(

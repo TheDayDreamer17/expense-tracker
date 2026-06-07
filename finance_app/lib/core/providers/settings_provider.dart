@@ -48,6 +48,7 @@ class AppSettings {
   final bool biometricEnabled;
   final bool onboardingDone;
   final String? geminiApiKey;
+  final bool localAutoBackupEnabled;
 
   const AppSettings({
     this.currency = 'INR',
@@ -59,13 +60,14 @@ class AppSettings {
     this.biometricEnabled = false,
     this.onboardingDone = false,
     this.geminiApiKey,
+    this.localAutoBackupEnabled = true,
   });
 
   AppSettings copyWith({
     String? currency, String? currencySymbol, String? defaultAccountId,
     bool? incomeReminderEnabled, String? incomeReminderTime,
     bool? pinEnabled, bool? biometricEnabled, bool? onboardingDone,
-    String? geminiApiKey,
+    String? geminiApiKey, bool? localAutoBackupEnabled,
   }) {
     return AppSettings(
       currency: currency ?? this.currency,
@@ -77,6 +79,7 @@ class AppSettings {
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       onboardingDone: onboardingDone ?? this.onboardingDone,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
+      localAutoBackupEnabled: localAutoBackupEnabled ?? this.localAutoBackupEnabled,
     );
   }
 }
@@ -103,6 +106,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       biometricEnabled: prefs.getBool('biometric_enabled') ?? false,
       onboardingDone: prefs.getBool('onboarding_done') ?? false,
       geminiApiKey: prefs.getString('gemini_api_key'),
+      localAutoBackupEnabled: prefs.getBool('local_auto_backup_enabled') ?? true,
     );
   }
 
@@ -117,6 +121,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await prefs.setBool('pin_enabled', updated.pinEnabled);
     await prefs.setBool('biometric_enabled', updated.biometricEnabled);
     await prefs.setBool('onboarding_done', updated.onboardingDone);
+    await prefs.setBool('local_auto_backup_enabled', updated.localAutoBackupEnabled);
     if (updated.geminiApiKey != null) {
       await prefs.setString('gemini_api_key', updated.geminiApiKey!);
     } else {

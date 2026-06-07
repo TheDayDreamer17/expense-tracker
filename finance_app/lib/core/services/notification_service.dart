@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
@@ -17,13 +18,49 @@ class NotificationService {
   static const subscriptionAlertBaseId = 3000;
   static const goalMilestoneBaseId = 4000;
 
-  Future<void> initialize() async {
+  // A stream for notification taps
+  final _tapController = StreamController<String>.broadcast();
+  Stream<String> get selectNotificationStream => _tapController.stream;
+
+  // Track the launch payload to consume once
+  String? _launchPayload;
+  String? get launchPayload {
+    final val = _launchPayload;
+    _launchPayload = null; // Consume once
+    return val;
+  }
+
+  Future<void> initialize({bool isMainApp = false}) async {
     tz.initializeTimeZones();
+
+    // Check if app was launched via notification tap (only if in main app context)
+    if (isMainApp) {
+      try {
+        final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+        if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
+          _launchPayload = launchDetails.notificationResponse?.payload;
+        }
+      } catch (_) {}
+
+      // Request notification permission for Android 13+
+      try {
+        await _plugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+      } catch (_) {}
+    }
+
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: android);
     await _plugin.initialize(
       settings,
-      onDidReceiveNotificationResponse: _onNotificationTap,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null) {
+          _tapController.add(payload);
+        }
+      },
     );
     await _createChannel();
   }
@@ -40,9 +77,6 @@ class NotificationService {
         ?.createNotificationChannel(channel);
   }
 
-  void _onNotificationTap(NotificationResponse response) {
-    // Navigation handled via payload in the app
-  }
 
   // ─── Income Reminder ────────────────────────────────────────────────────
   Future<void> scheduleMonthlyIncomeReminder({
@@ -130,6 +164,16 @@ class NotificationService {
       '🎯 Goal Milestone!',
       "You're $percent% toward your $goalName goal!",
       _notifDetails(payload: 'goals'),
+    );
+  }
+
+  // ─── SMS Transaction Alert ───────────────────────────────────────────────
+  Future<void> showSmsTransactionAlert({required double amount, String? merchant}) async {
+    await _plugin.show(
+      5000,
+      'New Transaction Detected',
+      'Tap to review ₹${amount.toStringAsFixed(2)} at ${merchant ?? 'Unknown'}',
+      _notifDetails(payload: 'sms'),
     );
   }
 

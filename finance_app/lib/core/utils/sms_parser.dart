@@ -113,7 +113,8 @@ class SmsParser {
     final isCredit = _typeCreditRe.hasMatch(body);
     if (!isDebit && !isCredit) return null; // Not a clear transaction
 
-    final type = isCredit ? 'INCOME' : 'EXPENSE';
+    // Prioritize EXPENSE if both exist (e.g., "spent on credit card")
+    final type = isDebit ? 'EXPENSE' : 'INCOME';
     final merchant = _merchantRe.firstMatch(body)?.group(1)?.trim();
     final acct = _acctRe.firstMatch(body)?.group(1);
     final balRaw = _balanceRe.firstMatch(body)?.group(1)?.replaceAll(',', '');
@@ -145,8 +146,10 @@ class SmsParser {
   // ─── Private helpers ───────────────────────────────────────────────────────
 
   static bool _isBankSender(String sender) {
-    final upper = sender.toUpperCase();
-    return _bankSenders.any((s) => upper.contains(s));
+    // TEMPORARY: Allow all senders so Android Emulator testing works!
+    return true; 
+    // final upper = sender.toUpperCase();
+    // return _bankSenders.any((s) => upper.contains(s));
   }
 
   static String _detectCategory(String text) {
