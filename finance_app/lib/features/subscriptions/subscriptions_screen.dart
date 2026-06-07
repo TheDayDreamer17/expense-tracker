@@ -6,6 +6,7 @@ import '../../core/db/database_helper.dart';
 import '../../core/models/models.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/services/notification_service.dart';
 
 class SubscriptionsScreen extends ConsumerStatefulWidget {
   const SubscriptionsScreen({super.key});
@@ -394,6 +395,8 @@ class _SubFormSheetState extends State<_SubFormSheet> {
       'created_at': widget.sub?.createdAt.millisecondsSinceEpoch ??
           DateTime.now().millisecondsSinceEpoch,
     });
+    // Reschedule all alerts when a subscription is added or updated
+    await NotificationService.instance.scheduleAllSubscriptionAlerts();
     widget.onSaved();
     if (mounted) Navigator.pop(context);
   }

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import '../db/database_helper.dart';
+import '../models/models.dart';
 
 class NotificationService {
   static final NotificationService instance = NotificationService._();
@@ -125,18 +127,43 @@ class NotificationService {
     required DateTime billingDate,
     required int index,
   }) async {
-    final alertDate = billingDate.subtract(const Duration(days: 3));
+    final alertDate = billingDate.subtract(const Duration(days: 5));
     if (alertDate.isBefore(DateTime.now())) return;
     final tzDate = tz.TZDateTime.from(alertDate, tz.local);
     await _plugin.zonedSchedule(
       subscriptionAlertBaseId + index,
       '💳 Upcoming Subscription',
-      '$name charges ₹${amount.toStringAsFixed(0)} in 3 days',
+      '$name charges ₹${amount.toStringAsFixed(0)} in 5 days',
       tzDate,
       _notifDetails(payload: 'subscription:$subId'),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     );
+  }
+
+  Future<void> scheduleAllSubscriptionAlerts() async {
+    try {
+      final db = DatabaseHelper.instance;
+      final rows = await db.query('subscriptions');
+      final subs = rows.map(SubscriptionModel.fromMap).toList();
+
+      for (int i = 0; i < 100; i++) {
+        await _plugin.cancel(subscriptionAlertBaseId + i);
+      }
+
+      for (int i = 0; i < subs.length; i++) {
+        final sub = subs[i];
+        await scheduleSubscriptionAlert(
+          subId: sub.id,
+          name: sub.name,
+          amount: sub.amount,
+          billingDate: sub.nextBillingDate,
+          index: i,
+        );
+      }
+    } catch (e) {
+      print('Error scheduling all subscription alerts: $e');
+    }
   }
 
   Future<void> showUnusedSubscriptionAlert({

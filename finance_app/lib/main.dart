@@ -32,6 +32,7 @@ void main() async {
 
   // Init notifications and SMS
   await NotificationService.instance.initialize(isMainApp: true);
+  await NotificationService.instance.scheduleAllSubscriptionAlerts();
   await NativeSmsService.instance.initialize();
 
   runApp(const ProviderScope(child: FinanceApp()));
