@@ -41,6 +41,32 @@ void main() {
       expect(result.type, 'INCOME');
     });
 
+    test('Parses Credited income SMS with from-merchant pattern (Tanmay Kumar)', () {
+      const body = 'Dear Customer, Acct XX907 is credited with Rs 425.00 on 05-Jun-26 from TANMAY KUMAR. UPI:071908363245-ICICI Bank.';
+      const sender = 'ICICIB';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNotNull);
+      expect(result!.amount, 425.00);
+      expect(result.type, 'INCOME');
+      expect(result.accountLast4, '907');
+      expect(result.merchant, 'TANMAY KUMAR');
+    });
+
+    test('Parses Credited income SMS with from-merchant pattern (Raj Kumar Mogor)', () {
+      const body = 'Dear Customer, Acct XX907 is credited with Rs 32.00 on 06-Jun-26 from RAJ KUMAR MOGOR. UPI:124322087415-ICICI Bank.';
+      const sender = 'ICICIB';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNotNull);
+      expect(result!.amount, 32.00);
+      expect(result.type, 'INCOME');
+      expect(result.accountLast4, '907');
+      expect(result.merchant, 'RAJ KUMAR MOGOR');
+    });
+
     test('Ignores normal text messages (not from a bank)', () {
       const body = 'Your Zomato order of Rs. 450 is on the way!';
       const sender = 'ZOMATO'; // Not in the bank list
