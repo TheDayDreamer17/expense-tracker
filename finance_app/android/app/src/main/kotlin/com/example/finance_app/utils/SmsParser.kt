@@ -8,7 +8,7 @@ object SmsParser {
     private val amountRe = Pattern.compile("(?:Rs\\.?|INR|₹)\\s?([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
     private val typeDebitRe = Pattern.compile("\\b(debited|debit|spent|paid|withdrawn|purchase|payment)\\b", Pattern.CASE_INSENSITIVE)
     private val typeCreditRe = Pattern.compile("\\b(credited|credit|received|deposited|refund|cashback)\\b", Pattern.CASE_INSENSITIVE)
-    private val acctRe = Pattern.compile("(?:a/c|account|card|ac)[\\s\\*xX]*(\\d{4})", Pattern.CASE_INSENSITIVE)
+    private val acctRe = Pattern.compile("(?:a/c|account|card|ac)(?:\\s+no\\.?|\\s+num\\.?|\\s+number)?[\\s\\*xX]*(\\d{4})", Pattern.CASE_INSENSITIVE)
     private val merchantRe = Pattern.compile("(?:\\bat\\b|\\bto\\b|\\btowards\\b|\\bfor\\b)\\s+([A-Za-z0-9@\\-_ &]{3,40}?)(?:\\s+on|\\s+via|\\s+ref|\\s+upi|[.\\n,]|$)", Pattern.CASE_INSENSITIVE)
     private val balanceRe = Pattern.compile("(?:avl\\.?\\s*bal(?:ance)?|available bal(?:ance)?|bal(?:ance)?[\\s:]*)[\\s:]+(?:Rs\\.?|INR|₹)\\s?([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
     private val upiRefRe = Pattern.compile("(?:upi\\s+ref(?:erence)?(?:\\s+no)?|ref\\s+no|txn\\s+id)[\\s:]*(\\d{12})", Pattern.CASE_INSENSITIVE)
@@ -46,7 +46,39 @@ object SmsParser {
 
         // Merchant
         val merMatcher = merchantRe.matcher(body)
-        val merchant = if (merMatcher.find()) merMatcher.group(1)?.trim() else null
+        var merchant = if (merMatcher.find()) merMatcher.group(1)?.trim() else null
+
+        if (merchant != null && (merchant.matches(Regex("^\\d+$")) || merchant.lowercase().contains("block") || merchant.lowercase().contains("no."))) {
+            merchant = null
+        }
+
+        if (merchant == null || merchant.isEmpty()) {
+            val lines = body.split("\n").map { it.trim() }
+            for (i in lines.indices) {
+                val line = lines[i]
+                if (line.lowercase().contains("limit") || line.lowercase().contains("bal")) {
+                    if (i > 0) {
+                        val prevLine = lines[i - 1]
+                        val lowerPrev = prevLine.lowercase()
+                        val isDateTime = prevLine.contains(Regex("\\d{2}-\\d{2}-\\d{2}")) ||
+                                         prevLine.contains(Regex("\\d{4}-\\d{2}-\\d{2}")) ||
+                                         lowerPrev.contains("ist") ||
+                                         lowerPrev.contains("gmt") ||
+                                         lowerPrev.contains("pm") ||
+                                         lowerPrev.contains("am")
+                        val isCardOrSpent = lowerPrev.contains("card") ||
+                                            lowerPrev.contains("spent") ||
+                                            lowerPrev.contains("rs.") ||
+                                            lowerPrev.contains("inr") ||
+                                            lowerPrev.contains("₹")
+                        if (!isDateTime && !isCardOrSpent && prevLine.isNotEmpty() && prevLine.length > 2) {
+                            merchant = prevLine
+                            break
+                        }
+                    }
+                }
+            }
+        }
 
         // Balance
         val balMatcher = balanceRe.matcher(body)
@@ -75,10 +107,10 @@ object SmsParser {
         var cardName: String? = null
         if (isCreditCard) {
             cardName = when {
-                lowerSender.contains("sbi") || lowerBody.contains("sbi card") || lowerBody.contains("sbicard") -> "SBI Card"
-                lowerSender.contains("hdfc") || lowerBody.contains("hdfc card") -> "HDFC Card"
-                lowerSender.contains("icici") || lowerBody.contains("icici card") -> "ICICI Card"
-                lowerSender.contains("axis") || lowerBody.contains("axis card") -> "Axis Card"
+                lowerSender.contains("sbi") || lowerBody.contains("sbi") -> "SBI Card"
+                lowerSender.contains("hdfc") || lowerBody.contains("hdfc") -> "HDFC Card"
+                lowerSender.contains("icici") || lowerBody.contains("icici") -> "ICICI Card"
+                lowerSender.contains("axis") || lowerBody.contains("axis") -> "Axis Card"
                 else -> "Credit Card"
             }
         }

@@ -34,7 +34,7 @@ class SmsParser {
     caseSensitive: false,
   );
   static final _acctRe = RegExp(
-    r'(?:a\/c|account|card|ac)[\s\*xX]*(\d{4})',
+    r'(?:a\/c|account|card|ac)(?:\s+no\.?|\s+num\.?|\s+number)?[\s\*xX]*(\d{4})',
     caseSensitive: false,
   );
   static final _merchantRe = RegExp(
@@ -115,10 +115,43 @@ class SmsParser {
 
     // Prioritize EXPENSE if both exist (e.g., "spent on credit card")
     final type = isDebit ? 'EXPENSE' : 'INCOME';
-    final merchant = _merchantRe.firstMatch(body)?.group(1)?.trim();
     final acct = _acctRe.firstMatch(body)?.group(1);
     final balRaw = _balanceRe.firstMatch(body)?.group(1)?.replaceAll(',', '');
     final balance = balRaw != null ? double.tryParse(balRaw) : null;
+
+    String? merchant = _merchantRe.firstMatch(body)?.group(1)?.trim();
+    if (merchant != null && (RegExp(r'^\d+$').hasMatch(merchant) || merchant.toLowerCase().contains('block') || merchant.toLowerCase().contains('no.'))) {
+      merchant = null;
+    }
+
+    if (merchant == null || merchant.isEmpty) {
+      final lines = body.split('\n').map((l) => l.trim()).toList();
+      for (int i = 0; i < lines.length; i++) {
+        final line = lines[i];
+        if (line.toLowerCase().contains('limit') || line.toLowerCase().contains('bal')) {
+          if (i > 0) {
+            final prevLine = lines[i - 1];
+            final lowerPrev = prevLine.toLowerCase();
+            final isDateTime = RegExp(r'\d{2}-\d{2}-\d{2}').hasMatch(prevLine) || 
+                               RegExp(r'\d{4}-\d{2}-\d{2}').hasMatch(prevLine) ||
+                               lowerPrev.contains('ist') || 
+                               lowerPrev.contains('gmt') ||
+                               lowerPrev.contains('pm') ||
+                               lowerPrev.contains('am');
+            final isCardOrSpent = lowerPrev.contains('card') || 
+                                  lowerPrev.contains('spent') || 
+                                  lowerPrev.contains('rs.') || 
+                                  lowerPrev.contains('inr') || 
+                                  lowerPrev.contains('₹');
+            if (!isDateTime && !isCardOrSpent && prevLine.isNotEmpty && prevLine.length > 2) {
+              merchant = prevLine;
+              break;
+            }
+          }
+        }
+      }
+    }
+
     final category = _detectCategory(merchant ?? body);
 
     final lowerBody = body.toLowerCase();
@@ -132,13 +165,13 @@ class SmsParser {
 
     String? cardName;
     if (isCreditCard) {
-      if (lowerSender.contains('sbi') || lowerBody.contains('sbi card') || lowerBody.contains('sbicard')) {
+      if (lowerSender.contains('sbi') || lowerBody.contains('sbi')) {
         cardName = 'SBI Card';
-      } else if (lowerSender.contains('hdfc') || lowerBody.contains('hdfc card')) {
+      } else if (lowerSender.contains('hdfc') || lowerBody.contains('hdfc')) {
         cardName = 'HDFC Card';
-      } else if (lowerSender.contains('icici') || lowerBody.contains('icici card')) {
+      } else if (lowerSender.contains('icici') || lowerBody.contains('icici')) {
         cardName = 'ICICI Card';
-      } else if (lowerSender.contains('axis') || lowerBody.contains('axis card')) {
+      } else if (lowerSender.contains('axis') || lowerBody.contains('axis')) {
         cardName = 'Axis Card';
       } else {
         cardName = 'Credit Card';
