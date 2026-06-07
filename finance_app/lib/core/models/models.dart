@@ -374,6 +374,7 @@ class NetWorthEntry {
 }
 
 class ParsedSmsTransaction {
+  final String? id;
   final double amount;
   final String type; // INCOME | EXPENSE
   final String? merchant;
@@ -384,6 +385,7 @@ class ParsedSmsTransaction {
   final String sender;
 
   const ParsedSmsTransaction({
+    this.id,
     required this.amount,
     required this.type,
     this.merchant,
@@ -393,4 +395,32 @@ class ParsedSmsTransaction {
     required this.smsRaw,
     required this.sender,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'amount': amount,
+      'type': type,
+      'merchant': merchant,
+      'accountLast4': accountLast4,
+      'balance': balance,
+      'suggestedCategory': suggestedCategory,
+      'smsRaw': smsRaw,
+      'sender': sender,
+    };
+  }
+
+  factory ParsedSmsTransaction.fromMap(Map<String, dynamic> map) {
+    return ParsedSmsTransaction(
+      id: map['id'] as String?,
+      amount: (map['amount'] as num).toDouble(),
+      type: map['type'] as String,
+      merchant: map['merchant'] as String?,
+      accountLast4: map['accountLast4'] as String?,
+      balance: map['balance'] != null ? (map['balance'] as num).toDouble() : null,
+      suggestedCategory: map['suggestedCategory'] as String,
+      smsRaw: map['smsRaw'] as String,
+      sender: map['sender'] as String,
+    );
+  }
 }

@@ -14,6 +14,7 @@ class TransactionModel {
   final bool isSmsImported;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? parentRecurringId;
 
   // Joined fields (not stored in transactions table)
   final String? categoryName;
@@ -38,6 +39,7 @@ class TransactionModel {
     this.isSmsImported = false,
     required this.createdAt,
     required this.updatedAt,
+    this.parentRecurringId,
     this.categoryName,
     this.categoryIcon,
     this.categoryColor,
@@ -62,6 +64,7 @@ class TransactionModel {
       isSmsImported: (map['is_sms_imported'] as int) == 1,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
+      parentRecurringId: map['parent_recurring_id'] as String?,
       categoryName: map['category_name'] as String?,
       categoryIcon: map['category_icon'] as String?,
       categoryColor: map['category_color'] as int?,
@@ -87,6 +90,7 @@ class TransactionModel {
       'is_sms_imported': isSmsImported ? 1 : 0,
       'created_at': createdAt.millisecondsSinceEpoch,
       'updated_at': updatedAt.millisecondsSinceEpoch,
+      'parent_recurring_id': parentRecurringId,
     };
   }
 
@@ -106,6 +110,7 @@ class TransactionModel {
     bool? isSmsImported,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? parentRecurringId,
     String? categoryName,
     String? categoryIcon,
     int? categoryColor,
@@ -128,6 +133,7 @@ class TransactionModel {
       isSmsImported: isSmsImported ?? this.isSmsImported,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      parentRecurringId: parentRecurringId ?? this.parentRecurringId,
       categoryName: categoryName ?? this.categoryName,
       categoryIcon: categoryIcon ?? this.categoryIcon,
       categoryColor: categoryColor ?? this.categoryColor,

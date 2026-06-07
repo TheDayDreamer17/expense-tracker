@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -17,12 +20,23 @@ class DatabaseHelper {
     final path = join(dbPath, 'finance_app.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 3,
       onCreate: _onCreate,
-      onForeignKeys: (db) async {
+      onUpgrade: _onUpgrade,
+      onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE transactions ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE transactions ADD COLUMN next_due_date INTEGER');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE transactions ADD COLUMN parent_recurring_id TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -66,12 +80,15 @@ class DatabaseHelper {
         note TEXT,
         receipt_path TEXT,
         is_recurring INTEGER NOT NULL DEFAULT 0,
+        is_template INTEGER NOT NULL DEFAULT 0,
+        next_due_date INTEGER,
         recurrence_rule TEXT,
         trip_id TEXT,
         sms_raw TEXT,
         is_sms_imported INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
+        parent_recurring_id TEXT,
         FOREIGN KEY (account_id) REFERENCES accounts(id),
         FOREIGN KEY (category_id) REFERENCES categories(id),
         FOREIGN KEY (trip_id) REFERENCES trips(id)
@@ -263,7 +280,9 @@ class DatabaseHelper {
 
   Future<int> insert(String table, Map<String, dynamic> values) async {
     final db = await database;
-    return db.insert(table, values, conflictAlgorithm: ConflictAlgorithm.replace);
+    final res = await db.insert(table, values, conflictAlgorithm: ConflictAlgorithm.replace);
+    _triggerAutoBackup();
+    return res;
   }
 
   Future<int> update(
@@ -273,7 +292,9 @@ class DatabaseHelper {
     required List<dynamic> whereArgs,
   }) async {
     final db = await database;
-    return db.update(table, values, where: where, whereArgs: whereArgs);
+    final res = await db.update(table, values, where: where, whereArgs: whereArgs);
+    _triggerAutoBackup();
+    return res;
   }
 
   Future<int> delete(
@@ -282,11 +303,49 @@ class DatabaseHelper {
     required List<dynamic> whereArgs,
   }) async {
     final db = await database;
-    return db.delete(table, where: where, whereArgs: whereArgs);
+    final res = await db.delete(table, where: where, whereArgs: whereArgs);
+    _triggerAutoBackup();
+    return res;
   }
 
   Future<List<Map<String, dynamic>>> rawQuery(String sql, [List<dynamic>? args]) async {
     final db = await database;
     return db.rawQuery(sql, args);
+  }
+
+  bool _isBackupScheduled = false;
+
+  void _triggerAutoBackup() {
+    if (_isBackupScheduled) return;
+    _isBackupScheduled = true;
+
+    Future.delayed(const Duration(seconds: 5), () async {
+      _isBackupScheduled = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final enabled = prefs.getBool('local_auto_backup_enabled') ?? true;
+        if (!enabled) return;
+
+        final data = {
+          'exported_at': DateTime.now().toIso8601String(),
+          'version': '1.0.0',
+          'accounts': await query('accounts'),
+          'categories': await query('categories'),
+          'transactions': await query('transactions'),
+          'budgets': await query('budgets'),
+          'trips': await query('trips'),
+          'goals': await query('goals'),
+          'subscriptions': await query('subscriptions'),
+          'net_worth_entries': await query('net_worth_entries'),
+        };
+        final json = const JsonEncoder().convert(data);
+
+        await const MethodChannel('com.example.finance_app/sms_methods')
+            .invokeMethod('saveBackupToDownloads', {
+          'json': json,
+          'fileName': 'smart_money_backup.json',
+        });
+      } catch (_) {}
+    });
   }
 }
