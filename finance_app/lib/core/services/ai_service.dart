@@ -58,7 +58,7 @@ class AiService {
       final accContext = accRows.map((r) => '${r['name']}: ₹${r['balance']}').join(', ');
 
       final fullPrompt = '''
-You are Smart Money Manager, a personalized financial AI assistant. 
+You are Orbit, a personalized financial AI assistant. 
 You are having a conversation with the user about their finances. 
 
 Here is their current financial context:

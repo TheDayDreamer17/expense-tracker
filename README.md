@@ -1,6 +1,6 @@
-# 💰 Smart Money Manager
+# 🪐 Orbit
 
-A premium, feature-rich personal finance tracking and budgeting application for Android, built with **Flutter**, **Riverpod**, and **SQLite**. Inspired by Realbyte's Money Manager, it is supercharged with native SMS transaction auto-detection, customizable AI financial advisory, and automated savings calculators.
+A premium, feature-rich personal finance tracking and budgeting application for Android, built with **Flutter**, **Riverpod**, and **SQLite**. Inspired by Realbyte\'s Money Manager, it is supercharged with native SMS transaction auto-detection, customizable AI financial advisory, and automated savings calculators.
 
 ---
 

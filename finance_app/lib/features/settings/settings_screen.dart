@@ -62,7 +62,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: Colors.white, size: 36),
               ),
               const SizedBox(height: 8),
-              const Text('Smart Money Manager',
+              const Text('Orbit',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const Text('v1.0.0',
                   style: TextStyle(
@@ -430,10 +430,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final json = const JsonEncoder.withIndent('  ').convert(data);
       final dir = await getTemporaryDirectory();
       final file = File(
-          '${dir.path}/smart_money_backup_${DateTime.now().millisecondsSinceEpoch}.json');
+          '${dir.path}/orbit_backup_${DateTime.now().millisecondsSinceEpoch}.json');
       await file.writeAsString(json);
       await Share.shareXFiles([XFile(file.path)],
-          text: 'Smart Money Manager Backup');
+          text: 'Orbit Backup');
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context)
@@ -516,13 +516,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final json = const JsonEncoder.withIndent('  ').convert(data);
       final dir = await getTemporaryDirectory();
       final file = File(
-          '${dir.path}/smart_money_backup_${DateTime.now().millisecondsSinceEpoch}.json');
+          '${dir.path}/orbit_backup_${DateTime.now().millisecondsSinceEpoch}.json');
       await file.writeAsString(json);
       
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Smart Money Manager Backup',
-        text: 'Backup of Smart Money Manager data. Save this file to Google Drive to keep it secure.',
+        subject: 'Orbit Backup',
+        text: 'Backup of Orbit data. Save this file to Google Drive to keep it secure.',
       );
     } catch (e) {
       if (mounted) {

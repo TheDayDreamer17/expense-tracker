@@ -28,7 +28,7 @@ class _PinLockScreenState extends ConsumerState<PinLockScreen> {
     final settings = ref.read(settingsProvider);
     if (!settings.biometricEnabled) return;
     try {
-      final ok = await _auth.authenticate(localizedReason: 'Unlock Smart Money Manager', options: const AuthenticationOptions(biometricOnly: true));
+      final ok = await _auth.authenticate(localizedReason: 'Unlock Orbit', options: const AuthenticationOptions(biometricOnly: true));
       if (ok && mounted) Navigator.pop(context);
     } catch (_) {}
   }

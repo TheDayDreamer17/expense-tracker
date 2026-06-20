@@ -38,3 +38,8 @@ key.properties
 # Logs
 *.log
 pubspec.lock
+
+# Databases & Images
+*.db
+screen.png
+

@@ -140,7 +140,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 10),
-          const Text('Smart Money'),
+          const Text('Orbit'),
         ],
       ),
       actions: [

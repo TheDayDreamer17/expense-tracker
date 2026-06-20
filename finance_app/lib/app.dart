@@ -38,7 +38,7 @@ class FinanceApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
-      title: 'Smart Money Manager',
+      title: 'Orbit',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
@@ -136,7 +136,7 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
           builder: (_) => AlertDialog(
             title: const Text('Restore from Backup?'),
             content: const Text(
-              'Welcome to Smart Money Manager! It looks like this is a fresh install. If you have a backup JSON file saved on your device, you can restore your accounts and transactions now.',
+              'Welcome to Orbit! It looks like this is a fresh install. If you have a backup JSON file saved on your device, you can restore your accounts and transactions now.',
             ),
             actions: [
               TextButton(
