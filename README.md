@@ -4,7 +4,16 @@ A premium, feature-rich personal finance tracking and budgeting application for 
 
 ---
 
+## 📚 Documentation
+
+For detailed information about this project, please consult the following guides:
+- 📖 [General Knowledge & Feature Guide](file:///e:/professional/AI%20Projects/ExpenseTracker/docs/general_knowledge.md): Explains app concepts, core features (SMS Parsing, Accounts, Budgeting, AI Copilot, Calculators, Subscriptions), and user workflows in detail.
+- 🛠️ [Technical Architecture & Debugging Guide](file:///e:/professional/AI%20Projects/ExpenseTracker/docs/technical_architecture.md): Contains implementation details, folder layout, SQLite database schemas, Kotlin SMS receiver architecture, state management overview, and developer debugging instructions.
+
+---
+
 ## ✨ Core Features Explained
+
 
 ### 1. 📲 SMS Intelligence & Automated Transaction Parsing
 - **Auto-Parsing Engine**: Detects incoming transaction SMS texts from Indian banks (SBI, HDFC, ICICI, Axis, PNB, Paytm, etc.). It extracts the transaction amount, type (Debit vs. Credit), card/account identification, and merchant name.
