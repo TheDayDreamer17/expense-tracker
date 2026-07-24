@@ -26,6 +26,7 @@ import 'features/networth/net_worth_screen.dart';
 import 'features/health_score/health_score_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/category_manager_screen.dart';
+import 'features/tax_planner/tax_planner_screen.dart';
 import 'widgets/sms_popup/sms_transaction_sheet.dart';
 import 'core/services/native_sms_service.dart';
 import 'core/services/notification_service.dart';
@@ -59,6 +60,7 @@ class FinanceApp extends ConsumerWidget {
         '/health-score': (_) => const HealthScoreScreen(),
         '/settings': (_) => const SettingsScreen(),
         '/category-manager': (_) => const CategoryManagerScreen(),
+        '/tax-planner': (_) => const TaxPlannerScreen(),
       },
     );
   }

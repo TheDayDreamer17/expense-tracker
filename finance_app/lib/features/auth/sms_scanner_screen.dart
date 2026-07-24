@@ -8,6 +8,8 @@ import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/services/transaction_service.dart';
+
 
 class SmsScannerScreen extends ConsumerStatefulWidget {
   const SmsScannerScreen({super.key});
@@ -107,28 +109,21 @@ class _SmsScannerScreenState extends ConsumerState<SmsScannerScreen> {
         }
       }
 
-      await db.insert('transactions', {
-        'id': id,
-        'account_id': targetAccountId,
-        'category_id': r.parsed.suggestedCategory,
-        'amount': r.parsed.amount,
-        'type': r.parsed.type,
-        'date': now - (idx * 60000), // approximate
-        'note': r.parsed.merchant,
-        'is_sms_imported': 1,
-        'is_recurring': 0,
-        'sms_raw': r.parsed.smsRaw,
-        'created_at': now,
-        'updated_at': now,
-      });
+      final tx = TransactionModel(
+        id: id,
+        accountId: targetAccountId,
+        categoryId: r.parsed.suggestedCategory,
+        amount: r.parsed.amount,
+        type: r.parsed.type,
+        date: DateTime.fromMillisecondsSinceEpoch(now - (idx * 60000)),
+        note: r.parsed.merchant,
+        isSmsImported: true,
+        smsRaw: r.parsed.smsRaw,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(now),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+      );
 
-      // Update Account Balance
-      final rows = await db.query('accounts', where: 'id = ?', whereArgs: [targetAccountId]);
-      if (rows.isNotEmpty) {
-        final current = (rows.first['balance'] as num).toDouble();
-        final newBalance = r.parsed.type == 'INCOME' ? current + r.parsed.amount : current - r.parsed.amount;
-        await db.update('accounts', {'balance': newBalance, 'updated_at': now}, where: 'id = ?', whereArgs: [targetAccountId]);
-      }
+      await TransactionService.instance.createTransaction(tx);
       count++;
     }
 

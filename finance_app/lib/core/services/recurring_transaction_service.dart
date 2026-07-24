@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
 import '../db/database_helper.dart';
+import '../models/transaction_model.dart';
+import 'transaction_service.dart';
 
 /// Checks all recurring transactions and creates new ones if their next due date has passed.
 /// Call this from main.dart on app startup.
@@ -23,38 +25,39 @@ class RecurringTransactionService {
       final nextDue = DateTime.fromMillisecondsSinceEpoch(t['next_due_date'] as int? ?? 0);
       if (nextDue.isAfter(now)) continue;
 
-      // Create the actual transaction
+      // Create the actual transaction occurrence
       final newId = const Uuid().v4();
       final ts = now.millisecondsSinceEpoch;
-      await db.insert('transactions', {
-        'id': newId,
-        'account_id': t['account_id'],
-        'category_id': t['category_id'],
-        'amount': t['amount'],
-        'type': t['type'],
-        'date': nextDue.millisecondsSinceEpoch,
-        'note': t['note'],
-        'is_recurring': 0,
-        'is_template': 0,
-        'is_sms_imported': 0,
-        'trip_id': t['trip_id'],
-        'created_at': ts,
-        'updated_at': ts,
-        'parent_recurring_id': t['id'],
-      });
+      
+      final newTx = TransactionModel(
+        id: newId,
+        accountId: t['account_id'] as String,
+        toAccountId: t['to_account_id'] as String?,
+        categoryId: t['category_id'] as String?,
+        amount: (t['amount'] as num).toDouble(),
+        type: t['type'] as String,
+        date: nextDue,
+        note: t['note'] as String?,
+        isRecurring: false,
+        isTemplate: false,
+        tripId: t['trip_id'] as String?,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(ts),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(ts),
+        parentRecurringId: t['id'] as String?,
+      );
 
-      // Advance the next_due_date on the template
+      await TransactionService.instance.createTransaction(newTx);
+
+      // Advance the next_due_date on the template row in the db
       final rule = t['recurrence_rule'] as String? ?? 'MONTHLY';
       final nextDate = _nextDate(nextDue, rule);
-      await db.update(
+      final rawDb = await DatabaseHelper.instance.database;
+      await rawDb.update(
         'transactions',
         {'next_due_date': nextDate.millisecondsSinceEpoch, 'updated_at': ts},
         where: 'id = ?',
         whereArgs: [t['id']],
       );
-
-      // Update account balance
-      await _updateBalance(t['account_id'] as String, (t['amount'] as num).toDouble(), t['type'] as String);
 
       count++;
     }
@@ -70,17 +73,5 @@ class RecurringTransactionService {
       'YEARLY'  => DateTime(from.year + 1, from.month, from.day, from.hour, from.minute),
       _         => from.add(const Duration(days: 30)),
     };
-  }
-
-  Future<void> _updateBalance(String accountId, double amount, String type) async {
-    final db = DatabaseHelper.instance;
-    final rows = await db.query('accounts', where: 'id = ?', whereArgs: [accountId]);
-    if (rows.isEmpty) return;
-    final current = (rows.first['balance'] as num).toDouble();
-    final newBalance = type == 'INCOME' ? current + amount : current - amount;
-    await db.update('accounts', {
-      'balance': newBalance,
-      'updated_at': DateTime.now().millisecondsSinceEpoch,
-    }, where: 'id = ?', whereArgs: [accountId]);
   }
 }

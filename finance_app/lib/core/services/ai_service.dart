@@ -110,6 +110,29 @@ If they are safe, encourage them. If they are projected to overspend, gently war
     }
   }
 
+  Future<String> getTaxAdvice(String taxReportText) async {
+    final key = apiKey;
+    if (provider != 'custom' && (key == null || key.isEmpty)) {
+      return 'Please configure your API Key in Settings to get AI tax advisory.';
+    }
+
+    final prompt = '''
+You are Orbit, a tax advisory assistant under the Indian Income Tax Act.
+Here is the user's current tax compilation summary:
+$taxReportText
+
+Please review their income sources, capital gains, and deduction utilization (80C, 80D, 80TTA).
+Provide a structured set of recommendations on:
+1. Which regime is better (Old vs New) and why.
+2. How they can optimize their investments to maximize tax savings (e.g., PPF, ELSS, NPS, or Health Insurance).
+3. If they have capital gains, suggest strategies like Tax Loss Harvesting if applicable.
+
+Be concise, clear, and professional. Use emojis.
+''';
+
+    return _callAI(prompt);
+  }
+
   Future<String> _callAI(String prompt) async {
     final activeModel = model ?? '';
     

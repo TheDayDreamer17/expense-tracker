@@ -1,6 +1,7 @@
 class TransactionModel {
   final String id;
   final String accountId;
+  final String? toAccountId;
   final String? categoryId;
   final double amount;
   final String type; // INCOME | EXPENSE | TRANSFER
@@ -8,6 +9,8 @@ class TransactionModel {
   final String? note;
   final String? receiptPath;
   final bool isRecurring;
+  final bool isTemplate;
+  final DateTime? nextDueDate;
   final String? recurrenceRule;
   final String? tripId;
   final String? smsRaw;
@@ -21,11 +24,13 @@ class TransactionModel {
   final String? categoryIcon;
   final int? categoryColor;
   final String? accountName;
+  final String? toAccountName;
   final String? tripName;
 
   const TransactionModel({
     required this.id,
     required this.accountId,
+    this.toAccountId,
     this.categoryId,
     required this.amount,
     required this.type,
@@ -33,6 +38,8 @@ class TransactionModel {
     this.note,
     this.receiptPath,
     this.isRecurring = false,
+    this.isTemplate = false,
+    this.nextDueDate,
     this.recurrenceRule,
     this.tripId,
     this.smsRaw,
@@ -44,6 +51,7 @@ class TransactionModel {
     this.categoryIcon,
     this.categoryColor,
     this.accountName,
+    this.toAccountName,
     this.tripName,
   });
 
@@ -51,6 +59,7 @@ class TransactionModel {
     return TransactionModel(
       id: map['id'] as String,
       accountId: map['account_id'] as String,
+      toAccountId: map['to_account_id'] as String?,
       categoryId: map['category_id'] as String?,
       amount: (map['amount'] as num).toDouble(),
       type: map['type'] as String,
@@ -58,6 +67,10 @@ class TransactionModel {
       note: map['note'] as String?,
       receiptPath: map['receipt_path'] as String?,
       isRecurring: (map['is_recurring'] as int) == 1,
+      isTemplate: (map['is_template'] as int? ?? 0) == 1,
+      nextDueDate: map['next_due_date'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['next_due_date'] as int)
+          : null,
       recurrenceRule: map['recurrence_rule'] as String?,
       tripId: map['trip_id'] as String?,
       smsRaw: map['sms_raw'] as String?,
@@ -69,6 +82,7 @@ class TransactionModel {
       categoryIcon: map['category_icon'] as String?,
       categoryColor: map['category_color'] as int?,
       accountName: map['account_name'] as String?,
+      toAccountName: map['to_account_name'] as String?,
       tripName: map['trip_name'] as String?,
     );
   }
@@ -77,6 +91,7 @@ class TransactionModel {
     return {
       'id': id,
       'account_id': accountId,
+      'to_account_id': toAccountId,
       'category_id': categoryId,
       'amount': amount,
       'type': type,
@@ -84,6 +99,8 @@ class TransactionModel {
       'note': note,
       'receipt_path': receiptPath,
       'is_recurring': isRecurring ? 1 : 0,
+      'is_template': isTemplate ? 1 : 0,
+      'next_due_date': nextDueDate?.millisecondsSinceEpoch,
       'recurrence_rule': recurrenceRule,
       'trip_id': tripId,
       'sms_raw': smsRaw,
@@ -97,6 +114,7 @@ class TransactionModel {
   TransactionModel copyWith({
     String? id,
     String? accountId,
+    String? toAccountId,
     String? categoryId,
     double? amount,
     String? type,
@@ -104,6 +122,8 @@ class TransactionModel {
     String? note,
     String? receiptPath,
     bool? isRecurring,
+    bool? isTemplate,
+    DateTime? nextDueDate,
     String? recurrenceRule,
     String? tripId,
     String? smsRaw,
@@ -115,11 +135,13 @@ class TransactionModel {
     String? categoryIcon,
     int? categoryColor,
     String? accountName,
+    String? toAccountName,
     String? tripName,
   }) {
     return TransactionModel(
       id: id ?? this.id,
       accountId: accountId ?? this.accountId,
+      toAccountId: toAccountId ?? this.toAccountId,
       categoryId: categoryId ?? this.categoryId,
       amount: amount ?? this.amount,
       type: type ?? this.type,
@@ -127,6 +149,8 @@ class TransactionModel {
       note: note ?? this.note,
       receiptPath: receiptPath ?? this.receiptPath,
       isRecurring: isRecurring ?? this.isRecurring,
+      isTemplate: isTemplate ?? this.isTemplate,
+      nextDueDate: nextDueDate ?? this.nextDueDate,
       recurrenceRule: recurrenceRule ?? this.recurrenceRule,
       tripId: tripId ?? this.tripId,
       smsRaw: smsRaw ?? this.smsRaw,
@@ -138,6 +162,7 @@ class TransactionModel {
       categoryIcon: categoryIcon ?? this.categoryIcon,
       categoryColor: categoryColor ?? this.categoryColor,
       accountName: accountName ?? this.accountName,
+      toAccountName: toAccountName ?? this.toAccountName,
       tripName: tripName ?? this.tripName,
     );
   }

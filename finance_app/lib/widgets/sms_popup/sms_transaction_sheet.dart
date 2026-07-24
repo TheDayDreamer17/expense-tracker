@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/models.dart';
+import '../../core/models/transaction_model.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'package:uuid/uuid.dart';
@@ -10,6 +11,8 @@ import '../../core/db/database_helper.dart';
 import '../../core/providers/refresh_provider.dart';
 import '../../core/services/native_sms_service.dart';
 import '../shared/create_category_dialog.dart';
+import '../../core/services/transaction_service.dart';
+
 
 class SmsTransactionSheet extends ConsumerStatefulWidget {
   final ParsedSmsTransaction parsed;
@@ -796,45 +799,26 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('merchant_cat_${merchant.toLowerCase()}', _selectedCategoryId);
       }
-      final db = DatabaseHelper.instance;
       final now = DateTime.now().millisecondsSinceEpoch;
       final id = const Uuid().v4();
 
-      final tx = {
-        'id': id,
-        'account_id': _selectedAccountId,
-        'category_id': _selectedCategoryId,
-        'amount': amount,
-        'type': _type,
-        'date': now,
-        'note': _noteController.text.trim().isEmpty
+      final tx = TransactionModel(
+        id: id,
+        accountId: _selectedAccountId,
+        categoryId: _selectedCategoryId,
+        amount: amount,
+        type: _type,
+        date: DateTime.fromMillisecondsSinceEpoch(now),
+        note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
-        'receipt_path': null,
-        'is_recurring': 0,
-        'is_template': 0,
-        'next_due_date': null,
-        'recurrence_rule': null,
-        'trip_id': null,
-        'sms_raw': widget.parsed.smsRaw,
-        'is_sms_imported': 1,
-        'created_at': now,
-        'updated_at': now,
-      };
+        isSmsImported: true,
+        smsRaw: widget.parsed.smsRaw,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(now),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+      );
 
-      await db.insert('transactions', tx);
-
-      // Audit log
-      await db.insert('audit_logs', {
-        'id': const Uuid().v4(),
-        'transaction_id': id,
-        'action': 'CREATE',
-        'after_data': tx.toString(),
-        'created_at': now,
-      });
-
-      // Update account balance
-      await _updateAccountBalance(_selectedAccountId, amount, _type);
+      await TransactionService.instance.createTransaction(tx);
 
       // Delete from native SMS transactions Room DB so it doesn't get picked up again
       if (widget.parsed.id != null) {
@@ -863,24 +847,6 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
         );
       }
     }
-  }
-
-  Future<void> _updateAccountBalance(
-      String accountId, double amount, String type) async {
-    final db = DatabaseHelper.instance;
-    final rows =
-        await db.query('accounts', where: 'id = ?', whereArgs: [accountId]);
-    if (rows.isEmpty) return;
-    final current = (rows.first['balance'] as num).toDouble();
-    final newBalance = type == 'INCOME' ? current + amount : current - amount;
-    await db.update(
-        'accounts',
-        {
-          'balance': newBalance,
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        },
-        where: 'id = ?',
-        whereArgs: [accountId]);
   }
 }
 

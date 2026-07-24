@@ -11,6 +11,8 @@ import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/providers/refresh_provider.dart';
 import '../../widgets/shared/create_category_dialog.dart';
+import '../../core/services/transaction_service.dart';
+
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
   final TransactionModel? existing;
@@ -30,6 +32,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
   String _type = 'EXPENSE';
   String? _selectedCategoryId;
   String _selectedAccountId = 'acc_cash';
+  String? _selectedToAccountId;
   DateTime _selectedDate = DateTime.now();
   bool _isRecurring = false;
   String _recurrenceRule = 'MONTHLY';
@@ -40,6 +43,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
   List<AccountModel> _accounts = [];
   List<CategoryModel> _categories = [];
   List<TripModel> _trips = [];
+
 
   @override
   void initState() {
@@ -62,6 +66,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
     _noteController.text = tx.note ?? '';
     _selectedCategoryId = tx.categoryId;
     _selectedAccountId = tx.accountId;
+    _selectedToAccountId = tx.toAccountId;
     _selectedDate = tx.date;
     _isRecurring = tx.isRecurring;
     _tripId = tx.tripId;
@@ -80,9 +85,13 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
         if (_accounts.isNotEmpty && !_accounts.any((a) => a.id == _selectedAccountId)) {
           _selectedAccountId = _accounts.first.id;
         }
+        if (_selectedToAccountId == null && _accounts.length > 1) {
+          _selectedToAccountId = _accounts.firstWhere((a) => a.id != _selectedAccountId).id;
+        }
       });
     }
   }
+
 
   @override
   void dispose() {
@@ -335,10 +344,39 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
                         child: Text(a.name),
                       ))
                   .toList(),
-              onChanged: (v) => setState(() => _selectedAccountId = v!),
+              onChanged: (v) {
+                setState(() {
+                  _selectedAccountId = v!;
+                  if (_selectedToAccountId == _selectedAccountId) {
+                    _selectedToAccountId = _accounts.firstWhere((a) => a.id != _selectedAccountId).id;
+                  }
+                });
+              },
             ),
           ),
         ),
+
+        // Destination Account for Transfer
+        if (_type == 'TRANSFER')
+          _FieldCard(
+            icon: Icons.login_outlined,
+            label: 'To Account',
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedToAccountId,
+                isExpanded: true,
+                items: _accounts
+                    .where((a) => a.id != _selectedAccountId)
+                    .map((a) => DropdownMenuItem(
+                          value: a.id,
+                          child: Text(a.name),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedToAccountId = v),
+              ),
+            ),
+          ),
+
 
         // Date
         _FieldCard(
@@ -597,52 +635,37 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('merchant_cat_${note.toLowerCase()}', _selectedCategoryId!);
       }
-      final db = DatabaseHelper.instance;
       final now = DateTime.now().millisecondsSinceEpoch;
       final id = widget.existing?.id ?? const Uuid().v4();
 
-      final tx = {
-        'id': id,
-        'account_id': _selectedAccountId,
-        'category_id': _selectedCategoryId,
-        'amount': amount,
-        'type': _type,
-        'date': _selectedDate.millisecondsSinceEpoch,
-        'note': _noteController.text.trim().isEmpty
+      final newTx = TransactionModel(
+        id: id,
+        accountId: _selectedAccountId,
+        toAccountId: _type == 'TRANSFER' ? _selectedToAccountId : null,
+        categoryId: _selectedCategoryId,
+        amount: amount,
+        type: _type,
+        date: _selectedDate,
+        note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
-        'receipt_path': _receiptPath,
-        'is_recurring': _isRecurring ? 1 : 0,
-        'recurrence_rule': _isRecurring ? _recurrenceRule : null,
-        'trip_id': _tripId,
-        'is_sms_imported': 0,
-        'created_at': widget.existing?.createdAt.millisecondsSinceEpoch ?? now,
-        'updated_at': now,
-      };
+        receiptPath: _receiptPath,
+        isRecurring: _isRecurring,
+        isTemplate: _isRecurring,
+        nextDueDate: _isRecurring ? _selectedDate : null,
+        recurrenceRule: _isRecurring ? _recurrenceRule : null,
+        tripId: _tripId,
+        isSmsImported: widget.existing?.isSmsImported ?? false,
+        createdAt: widget.existing?.createdAt ?? DateTime.fromMillisecondsSinceEpoch(now),
+        updatedAt: DateTime.fromMillisecondsSinceEpoch(now),
+        parentRecurringId: widget.existing?.parentRecurringId,
+      );
 
       if (widget.existing == null) {
-        await db.insert('transactions', tx);
-        // Audit log
-        await db.insert('audit_logs', {
-          'id': const Uuid().v4(),
-          'transaction_id': id,
-          'action': 'CREATE',
-          'after_data': tx.toString(),
-          'created_at': now,
-        });
+        await TransactionService.instance.createTransaction(newTx);
       } else {
-        await db.update('transactions', tx, where: 'id = ?', whereArgs: [id]);
-        await db.insert('audit_logs', {
-          'id': const Uuid().v4(),
-          'transaction_id': id,
-          'action': 'UPDATE',
-          'after_data': tx.toString(),
-          'created_at': now,
-        });
+        await TransactionService.instance.updateTransaction(widget.existing!, newTx);
       }
-
-      // Update account balance
-      await _updateAccountBalance(_selectedAccountId, amount, _type);
 
       // Refresh screens
       ref.read(transactionUpdateProvider.notifier).state++;
@@ -669,24 +692,6 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
     }
   }
 
-  Future<void> _updateAccountBalance(
-      String accountId, double amount, String type) async {
-    final db = DatabaseHelper.instance;
-    final rows =
-        await db.query('accounts', where: 'id = ?', whereArgs: [accountId]);
-    if (rows.isEmpty) return;
-    final current = (rows.first['balance'] as num).toDouble();
-    final newBalance = type == 'INCOME' ? current + amount : current - amount;
-    await db.update(
-        'accounts',
-        {
-          'balance': newBalance,
-          'updated_at': DateTime.now().millisecondsSinceEpoch,
-        },
-        where: 'id = ?',
-        whereArgs: [accountId]);
-  }
-
   Future<void> _deleteTransaction() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -706,16 +711,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen>
       ),
     );
     if (confirm == true && widget.existing != null) {
-      final db = DatabaseHelper.instance;
-      await db.delete('transactions',
-          where: 'id = ?', whereArgs: [widget.existing!.id]);
-      await db.insert('audit_logs', {
-        'id': const Uuid().v4(),
-        'transaction_id': widget.existing!.id,
-        'action': 'DELETE',
-        'before_data': widget.existing!.toMap().toString(),
-        'created_at': DateTime.now().millisecondsSinceEpoch,
-      });
+      await TransactionService.instance.deleteTransaction(widget.existing!);
       // Refresh screens
       ref.read(transactionUpdateProvider.notifier).state++;
       if (mounted) Navigator.pop(context, true);

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 
 // ─── Theme provider ────────────────────────────────────────────────────────
 final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
@@ -103,12 +105,34 @@ final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>((r
 });
 
 class SettingsNotifier extends StateNotifier<AppSettings> {
+  static const _secureStorage = FlutterSecureStorage();
+
   SettingsNotifier() : super(const AppSettings()) {
     _load();
   }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Migrate keys if they exist in SharedPreferences
+    String? geminiKey = await _secureStorage.read(key: 'gemini_api_key');
+    if (geminiKey == null && prefs.containsKey('gemini_api_key')) {
+      geminiKey = prefs.getString('gemini_api_key');
+      if (geminiKey != null) {
+        await _secureStorage.write(key: 'gemini_api_key', value: geminiKey);
+        await prefs.remove('gemini_api_key');
+      }
+    }
+
+    String? aiKey = await _secureStorage.read(key: 'ai_api_key');
+    if (aiKey == null && prefs.containsKey('ai_api_key')) {
+      aiKey = prefs.getString('ai_api_key');
+      if (aiKey != null) {
+        await _secureStorage.write(key: 'ai_api_key', value: aiKey);
+        await prefs.remove('ai_api_key');
+      }
+    }
+
     state = AppSettings(
       currency: prefs.getString('currency') ?? 'INR',
       currencySymbol: prefs.getString('currency_symbol') ?? '₹',
@@ -118,10 +142,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       pinEnabled: prefs.getBool('pin_enabled') ?? false,
       biometricEnabled: prefs.getBool('biometric_enabled') ?? false,
       onboardingDone: prefs.getBool('onboarding_done') ?? false,
-      geminiApiKey: prefs.getString('gemini_api_key'),
+      geminiApiKey: geminiKey,
       localAutoBackupEnabled: prefs.getBool('local_auto_backup_enabled') ?? true,
       aiProvider: prefs.getString('ai_provider') ?? 'gemini',
-      aiApiKey: prefs.getString('ai_api_key'),
+      aiApiKey: aiKey,
       aiCustomEndpoint: prefs.getString('ai_custom_endpoint') ?? '',
       aiModel: prefs.getString('ai_model') ?? 'gemini-1.5-flash',
     );
@@ -139,23 +163,24 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     await prefs.setBool('biometric_enabled', updated.biometricEnabled);
     await prefs.setBool('onboarding_done', updated.onboardingDone);
     await prefs.setBool('local_auto_backup_enabled', updated.localAutoBackupEnabled);
+    
     if (updated.geminiApiKey != null) {
-      await prefs.setString('gemini_api_key', updated.geminiApiKey!);
+      await _secureStorage.write(key: 'gemini_api_key', value: updated.geminiApiKey!);
     } else {
-      await prefs.remove('gemini_api_key');
+      await _secureStorage.delete(key: 'gemini_api_key');
     }
     await prefs.setString('ai_provider', updated.aiProvider);
     if (updated.aiApiKey != null) {
-      await prefs.setString('ai_api_key', updated.aiApiKey!);
+      await _secureStorage.write(key: 'ai_api_key', value: updated.aiApiKey!);
     } else {
-      await prefs.remove('ai_api_key');
+      await _secureStorage.delete(key: 'ai_api_key');
     }
     await prefs.setString('ai_custom_endpoint', updated.aiCustomEndpoint ?? '');
     await prefs.setString('ai_model', updated.aiModel ?? '');
     
     // Fallback sync for gemini key
     if (updated.aiProvider == 'gemini' && updated.aiApiKey != null) {
-      await prefs.setString('gemini_api_key', updated.aiApiKey!);
+      await _secureStorage.write(key: 'gemini_api_key', value: updated.aiApiKey!);
     }
   }
 }

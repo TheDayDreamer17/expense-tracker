@@ -7,6 +7,8 @@ import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import 'add_transaction_screen.dart';
 import '../../core/providers/refresh_provider.dart';
+import '../../core/services/transaction_service.dart';
+
 
 class TransactionListScreen extends ConsumerStatefulWidget {
   const TransactionListScreen({super.key});
@@ -42,10 +44,11 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
   Future<void> _load() async {
     final rows = await DatabaseHelper.instance.rawQuery('''
       SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color,
-             a.name as account_name
+             a.name as account_name, a2.name as to_account_name
       FROM transactions t
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN accounts a2 ON t.to_account_id = a2.id
       ORDER BY t.date DESC
     ''');
     if (mounted) {
@@ -213,14 +216,14 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> {
                                   ),
                                 ),
                                 onDismissed: (_) async {
-                                  await DatabaseHelper.instance.delete('transactions', where: 'id = ?', whereArgs: [e.value.id]);
+                                  await TransactionService.instance.deleteTransaction(e.value);
                                   ref.read(transactionUpdateProvider.notifier).state++;
                                   _load();
                                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: const Text('Transaction deleted'),
                                       action: SnackBarAction(label: 'Undo', onPressed: () async {
-                                        await DatabaseHelper.instance.insert('transactions', e.value.toMap());
+                                        await TransactionService.instance.createTransaction(e.value);
                                         ref.read(transactionUpdateProvider.notifier).state++;
                                         _load();
                                       }),
@@ -300,9 +303,15 @@ class _TxTile extends StatelessWidget {
         ),
         child: Center(child: Text(_emoji(tx.categoryId ?? '', tx.categoryIcon), style: const TextStyle(fontSize: 20))),
       ),
-      title: Text(tx.categoryName ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      title: Text(tx.isTransfer ? 'Transfer' : (tx.categoryName ?? 'Unknown'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
       subtitle: Text(
-        [tx.note, tx.accountName, DateFormatter.formatTime(tx.date)].where((s) => s != null && s.isNotEmpty).join(' · '),
+        [
+          tx.note,
+          tx.isTransfer && tx.toAccountName != null
+              ? '${tx.accountName} ➔ ${tx.toAccountName}'
+              : tx.accountName,
+          DateFormatter.formatTime(tx.date)
+        ].where((s) => s != null && s.isNotEmpty).join(' · '),
         style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis,
       ),
       trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [

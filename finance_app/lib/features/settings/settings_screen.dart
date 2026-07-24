@@ -163,6 +163,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ]),
 
+          _SectionHeader('Tax Planning'),
+          _SettingCard(children: [
+            _SettingRow(
+              icon: Icons.percent,
+              label: 'Tax Planner & Advisor',
+              subtitle: 'Compare Old vs New Regimes and parse Zerodha capital gains',
+              onTap: () => Navigator.pushNamed(context, '/tax-planner'),
+            ),
+          ]),
+
+
           _SectionHeader('Categories'),
           _SettingCard(children: [
             _SettingRow(

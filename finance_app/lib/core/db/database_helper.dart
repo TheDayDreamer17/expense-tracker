@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, 'finance_app.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onConfigure: (db) async {
@@ -37,6 +37,23 @@ class DatabaseHelper {
     }
     if (oldVersion < 3) {
       await db.execute('ALTER TABLE transactions ADD COLUMN parent_recurring_id TEXT');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE transactions ADD COLUMN to_account_id TEXT');
+      await db.execute('''
+        CREATE TABLE tax_investment_records (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          asset_name TEXT NOT NULL,
+          amount REAL NOT NULL,
+          date INTEGER NOT NULL
+        )
+      ''');
+      await db.execute('CREATE INDEX idx_transactions_date ON transactions(date DESC)');
+      await db.execute('CREATE INDEX idx_transactions_account ON transactions(account_id)');
+      await db.execute('CREATE INDEX idx_transactions_category ON transactions(category_id)');
+      await db.execute('CREATE INDEX idx_transactions_to_account ON transactions(to_account_id)');
+      await db.execute('CREATE INDEX idx_transactions_sms ON transactions(sms_raw)');
     }
   }
 
@@ -74,6 +91,7 @@ class DatabaseHelper {
       CREATE TABLE transactions (
         id TEXT PRIMARY KEY,
         account_id TEXT NOT NULL,
+        to_account_id TEXT,
         category_id TEXT,
         amount REAL NOT NULL,
         type TEXT NOT NULL,
@@ -91,6 +109,7 @@ class DatabaseHelper {
         updated_at INTEGER NOT NULL,
         parent_recurring_id TEXT,
         FOREIGN KEY (account_id) REFERENCES accounts(id),
+        FOREIGN KEY (to_account_id) REFERENCES accounts(id),
         FOREIGN KEY (category_id) REFERENCES categories(id),
         FOREIGN KEY (trip_id) REFERENCES trips(id)
       )
@@ -195,6 +214,23 @@ class DatabaseHelper {
         value TEXT NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE tax_investment_records (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        asset_name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        date INTEGER NOT NULL
+      )
+    ''');
+
+    // Create Indexes
+    await db.execute('CREATE INDEX idx_transactions_date ON transactions(date DESC)');
+    await db.execute('CREATE INDEX idx_transactions_account ON transactions(account_id)');
+    await db.execute('CREATE INDEX idx_transactions_category ON transactions(category_id)');
+    await db.execute('CREATE INDEX idx_transactions_to_account ON transactions(to_account_id)');
+    await db.execute('CREATE INDEX idx_transactions_sms ON transactions(sms_raw)');
 
     await _insertDefaultData(db);
   }
