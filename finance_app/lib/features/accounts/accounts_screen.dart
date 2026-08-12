@@ -151,53 +151,86 @@ class _AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = Color(account.color);
     final isCreditCard = account.type == 'CREDIT_CARD';
+    final isBank = account.type == 'BANK' || account.type == 'CASH';
+    final isInvestment = account.type == 'INVESTMENT';
+    final isLoan = account.type == 'LOAN';
+
     final outstanding = isCreditCard ? (account.balance < 0 ? account.balance.abs() : 0.0) : account.balance;
     final available = isCreditCard && account.creditLimit != null ? account.creditLimit! + account.balance : null;
 
-    return Card(
+    String subtitleText = '';
+    String trailingTitle = '';
+    String trailingSubtitle = '';
+    Color trailingColor = AppColors.primary;
+
+    if (isBank) {
+      subtitleText = account.type.toLowerCase();
+      trailingTitle = CurrencyFormatter.format(account.balance);
+      trailingColor = account.balance >= 0 ? AppColors.success : AppColors.expense;
+    } else if (isCreditCard) {
+      subtitleText = 'Available: ${available != null ? CurrencyFormatter.formatCompact(available) : "N/A"}';
+      if (account.paymentDay != null) {
+        subtitleText += ' · Due Day: ${account.paymentDay}';
+      }
+      trailingTitle = 'Owes: ${CurrencyFormatter.format(outstanding)}';
+      trailingSubtitle = 'Limit: ${account.creditLimit != null ? CurrencyFormatter.formatCompact(account.creditLimit!) : "N/A"}';
+      trailingColor = outstanding > 0 ? AppColors.expense : AppColors.success;
+    } else if (isInvestment) {
+      subtitleText = 'Invested Asset';
+      trailingTitle = CurrencyFormatter.format(account.balance);
+      trailingColor = AppColors.success;
+    } else if (isLoan) {
+      subtitleText = account.paymentDay != null ? 'Next EMI: Day ${account.paymentDay}' : 'Active Loan';
+      trailingTitle = 'Owed: ${CurrencyFormatter.format(account.balance.abs())}';
+      trailingColor = AppColors.expense;
+    }
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.08)),
+      ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12)),
+            color: color.withOpacity(0.08),
+            shape: BoxShape.circle,
+          ),
           child: Center(
-              child: Text(_typeEmoji(account.type),
-                  style: const TextStyle(fontSize: 22))),
+            child: Text(
+              _typeEmoji(account.type),
+              style: const TextStyle(fontSize: 22),
+            ),
+          ),
         ),
-        title: Text(account.name,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(account.type.replaceAll('_', ' ').toLowerCase(),
-            style: const TextStyle(
-                fontSize: 12, color: AppColors.lightTextSecondary)),
+        title: Text(
+          account.name,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        subtitle: Text(
+          subtitleText,
+          style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
+        ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              isCreditCard
-                  ? 'Outstanding: ${CurrencyFormatter.formatCompact(outstanding)}'
-                  : CurrencyFormatter.formatCompact(account.balance),
-              style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: isCreditCard
-                      ? (outstanding > 0 ? AppColors.expense : AppColors.income)
-                      : (account.balance >= 0 ? AppColors.income : AppColors.expense)),
+              trailingTitle,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: trailingColor),
             ),
-            if (isCreditCard && available != null)
+            if (trailingSubtitle.isNotEmpty) ...[
+              const SizedBox(height: 2),
               Text(
-                  'Available: ${CurrencyFormatter.formatCompact(available)}',
-                  style: const TextStyle(
-                      fontSize: 10, color: AppColors.lightTextSecondary))
-            else if (account.creditLimit != null)
-              Text(
-                  'Limit: ${CurrencyFormatter.formatCompact(account.creditLimit!)}',
-                  style: const TextStyle(
-                      fontSize: 10, color: AppColors.lightTextSecondary)),
+                trailingSubtitle,
+                style: const TextStyle(fontSize: 10, color: AppColors.lightTextSecondary),
+              ),
+            ],
           ],
         ),
         onTap: onTap,

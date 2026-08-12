@@ -7,6 +7,7 @@ import '../../core/models/transaction_model.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/providers/refresh_provider.dart';
+import '../../widgets/shared/empty_state.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -177,6 +178,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen>
   }
 
   Widget _buildOverview() {
+    if (_transactions.isEmpty) {
+      return EmptyState(
+        icon: '📊',
+        title: 'Your spending story will appear here',
+        description: 'Add a few transactions to see category trends and monthly comparisons.',
+        buttonLabel: 'Add transaction',
+        onAction: () => Navigator.pushNamed(context, '/add-transaction'),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [

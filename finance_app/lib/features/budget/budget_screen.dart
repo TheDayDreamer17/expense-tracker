@@ -9,6 +9,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/services/ai_service.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/providers/refresh_provider.dart';
+import '../../widgets/shared/empty_state.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -132,21 +133,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   if (_budgets.isEmpty)
-                    Center(
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 40),
-                          const Text('🎯', style: TextStyle(fontSize: 48)),
-                          const SizedBox(height: 12),
-                          const Text('No budgets set',
-                              style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          const Text('Tap + to add a budget for a category',
-                              style: TextStyle(
-                                  color: AppColors.lightTextSecondary)),
-                        ],
-                      ),
+                    EmptyState(
+                      icon: '🎯',
+                      title: 'No budgets set',
+                      description: 'Set monthly budget limits for categories to control your spending.',
+                      buttonLabel: 'Set budget',
+                      onAction: _showAddBudgetSheet,
                     )
                   else
                     ..._budgets.asMap().entries.map((e) => _BudgetProgressCard(

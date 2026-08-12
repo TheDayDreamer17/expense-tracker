@@ -292,45 +292,115 @@ class _TxTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isExpense = tx.isExpense;
-    final color = isExpense ? AppColors.expense : tx.isIncome ? AppColors.income : AppColors.transfer;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Container(
-        width: 44, height: 44,
-        decoration: BoxDecoration(
-          color: (tx.categoryColor != null ? Color(tx.categoryColor!) : AppColors.primary).withOpacity(0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(child: Text(_emoji(tx.categoryId ?? '', tx.categoryIcon), style: const TextStyle(fontSize: 20))),
+    final isIncome = tx.isIncome;
+    final amountColor = isExpense
+        ? AppColors.expense
+        : isIncome
+            ? AppColors.success
+            : AppColors.lightTextSecondary;
+
+    final dateStr = DateFormatter.relativeDate(tx.date);
+    final timeStr = DateFormatter.formatTime(tx.date);
+
+    final displayAccount = tx.isTransfer && tx.toAccountName != null
+        ? '${tx.accountName} ➔ ${tx.toAccountName}'
+        : tx.accountName;
+
+    final subtitleSegments = [
+      tx.isTransfer ? 'Transfer' : tx.categoryName,
+      displayAccount,
+      '$dateStr, $timeStr',
+    ];
+    final detailText = subtitleSegments.where((s) => s != null && s.isNotEmpty).join(' · ');
+
+    final colorHex = tx.categoryColor ?? AppColors.primary.value;
+    final Color catColor = Color(colorHex);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.08)),
       ),
-      title: Text(tx.isTransfer ? 'Transfer' : (tx.categoryName ?? 'Unknown'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-      subtitle: Text(
-        [
-          tx.note,
-          tx.isTransfer && tx.toAccountName != null
-              ? '${tx.accountName} ➔ ${tx.toAccountName}'
-              : tx.accountName,
-          DateFormatter.formatTime(tx.date)
-        ].where((s) => s != null && s.isNotEmpty).join(' · '),
-        style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Text(
-          '${isExpense ? '-' : tx.isIncome ? '+' : ''}${CurrencyFormatter.formatCompact(tx.amount)}',
-          style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: catColor.withOpacity(0.08),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              _emoji(tx.categoryId ?? '', tx.categoryIcon),
+              style: const TextStyle(fontSize: 20),
+            ),
+          ),
         ),
-        if (tx.isSmsImported) const Text('📲 SMS', style: TextStyle(fontSize: 10, color: AppColors.lightTextSecondary)),
-      ]),
-      onTap: onTap,
+        title: Text(
+          tx.note ?? tx.categoryName ?? 'Unknown',
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            detailText,
+            style: const TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (tx.isSmsImported) ...[
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'SMS',
+                  style: TextStyle(color: Colors.amber, fontSize: 9, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+            Text(
+              '${isExpense ? '−' : isIncome ? '+' : ''}${CurrencyFormatter.format(tx.amount)}',
+              style: TextStyle(color: amountColor, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ],
+        ),
+        onTap: onTap,
+      ),
     );
   }
 
   String _emoji(String id, String? customIcon) {
     if (customIcon != null && customIcon.isNotEmpty) return customIcon;
-    const map = {'cat_food':'🍕','cat_grocery':'🛒','cat_transport':'🚗','cat_shopping':'🛍️',
-      'cat_entertainment':'🎬','cat_health':'💊','cat_utilities':'⚡','cat_telecom':'📱',
-      'cat_education':'🎓','cat_subscription':'🔄','cat_salary':'💰','cat_freelance':'💻',
-      'cat_investment':'📈','cat_gift':'🎁','cat_travel':'✈️'};
+    const map = {
+      'cat_food': '🍔',
+      'cat_grocery': '🛒',
+      'cat_transport': '🚗',
+      'cat_shopping': '🛍️',
+      'cat_entertainment': '🎬',
+      'cat_health': '💊',
+      'cat_utilities': '⚡',
+      'cat_telecom': '📱',
+      'cat_education': '🎓',
+      'cat_subscription': '🔄',
+      'cat_salary': '💰',
+      'cat_freelance': '💻',
+      'cat_investment': '📈',
+      'cat_gift': '🎁',
+      'cat_travel': '✈️',
+    };
     return map[id] ?? '💸';
   }
 }

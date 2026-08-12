@@ -27,6 +27,8 @@ import 'features/health_score/health_score_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/category_manager_screen.dart';
 import 'features/tax_planner/tax_planner_screen.dart';
+import 'features/more/more_screen.dart';
+
 import 'widgets/sms_popup/sms_transaction_sheet.dart';
 import 'core/services/native_sms_service.dart';
 import 'core/services/notification_service.dart';
@@ -61,6 +63,7 @@ class FinanceApp extends ConsumerWidget {
         '/settings': (_) => const SettingsScreen(),
         '/category-manager': (_) => const CategoryManagerScreen(),
         '/tax-planner': (_) => const TaxPlannerScreen(),
+        '/more': (_) => const MoreScreen(),
       },
     );
   }
@@ -80,10 +83,10 @@ class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver
 
   final _pages = const [
     DashboardScreen(),
+    TransactionListScreen(),
     ReportsScreen(),
-    AccountsScreen(),
     BudgetScreen(),
-    SettingsScreen(),
+    MoreScreen(),
   ];
 
   @override
@@ -461,13 +464,27 @@ class _BottomNav extends StatelessWidget {
       notchMargin: 8,
       elevation: 8,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _NavItem(icon: Icons.home_rounded, label: 'Home', index: 0, current: currentIndex, onTap: onTap),
-          _NavItem(icon: Icons.bar_chart_rounded, label: 'Reports', index: 1, current: currentIndex, onTap: onTap),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _NavItem(icon: Icons.home_rounded, label: 'Home', index: 0, current: currentIndex, onTap: onTap),
+                _NavItem(icon: Icons.receipt_long_rounded, label: 'Transactions', index: 1, current: currentIndex, onTap: onTap),
+              ],
+            ),
+          ),
           const SizedBox(width: 48), // FAB space
-          _NavItem(icon: Icons.account_balance_wallet_rounded, label: 'Accounts', index: 2, current: currentIndex, onTap: onTap),
-          _NavItem(icon: Icons.tune_rounded, label: 'Budget', index: 3, current: currentIndex, onTap: onTap),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _NavItem(icon: Icons.insights_rounded, label: 'Insights', index: 2, current: currentIndex, onTap: onTap),
+                _NavItem(icon: Icons.tune_rounded, label: 'Budget', index: 3, current: currentIndex, onTap: onTap),
+                _NavItem(icon: Icons.more_horiz_rounded, label: 'More', index: 4, current: currentIndex, onTap: onTap),
+              ],
+            ),
+          ),
         ],
       ),
     );
