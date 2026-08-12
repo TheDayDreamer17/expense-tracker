@@ -385,6 +385,7 @@ class ParsedSmsTransaction {
   final String sender;
   final bool isCreditCard;
   final String? cardName;
+  final DateTime? timestamp;
 
   const ParsedSmsTransaction({
     this.id,
@@ -398,6 +399,7 @@ class ParsedSmsTransaction {
     required this.sender,
     this.isCreditCard = false,
     this.cardName,
+    this.timestamp,
   });
 
   Map<String, dynamic> toMap() {
@@ -413,6 +415,7 @@ class ParsedSmsTransaction {
       'sender': sender,
       'isCreditCard': isCreditCard ? 1 : 0,
       'cardName': cardName,
+      'timestamp': timestamp?.millisecondsSinceEpoch,
     };
   }
 
@@ -429,6 +432,11 @@ class ParsedSmsTransaction {
       sender: map['sender'] as String,
       isCreditCard: map['isCreditCard'] == 1 || map['isCreditCard'] == true,
       cardName: map['cardName'] as String?,
+      timestamp: map['timestamp'] != null
+          ? (map['timestamp'] is int
+              ? DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int)
+              : DateTime.tryParse(map['timestamp'].toString()))
+          : null,
     );
   }
 }

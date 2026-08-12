@@ -296,9 +296,18 @@ class _SubFormSheetState extends State<_SubFormSheet> {
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            Text(widget.sub == null ? 'Add Subscription' : 'Edit Subscription',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.sub == null ? 'Add Subscription' : 'Edit Subscription',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                if (widget.sub != null)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: AppColors.expense),
+                    onPressed: _saving ? null : _delete,
+                  ),
+              ],
+            ),
             const SizedBox(height: 12),
             // Quick presets
             SizedBox(
@@ -378,6 +387,32 @@ class _SubFormSheetState extends State<_SubFormSheet> {
                         widget.sub == null ? 'Add Subscription' : 'Update'))),
           ])),
     );
+  }
+
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Subscription'),
+        content: Text('Are you sure you want to delete "${widget.sub!.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.expense),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && widget.sub != null) {
+      setState(() => _saving = true);
+      await DatabaseHelper.instance.delete('subscriptions', where: 'id = ?', whereArgs: [widget.sub!.id]);
+      await NotificationService.instance.scheduleAllSubscriptionAlerts();
+      widget.onSaved();
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   Future<void> _save() async {

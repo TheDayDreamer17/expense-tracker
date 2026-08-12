@@ -242,7 +242,17 @@ class _TripFormSheetState extends State<_TripFormSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
-          Text(widget.trip == null ? 'Create Trip' : 'Edit Trip', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(widget.trip == null ? 'Create Trip' : 'Edit Trip', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              if (widget.trip != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppColors.expense),
+                  onPressed: _saving ? null : _delete,
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
           TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Trip Name', prefixIcon: Icon(Icons.flight_takeoff))),
           const SizedBox(height: 12),
@@ -275,6 +285,34 @@ class _TripFormSheetState extends State<_TripFormSheet> {
         ]),
       ),
     );
+  }
+
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Trip'),
+        content: Text('Are you sure you want to delete "${widget.trip!.name}"? Tagged transactions will be kept and unlinked.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.expense),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && widget.trip != null) {
+      setState(() => _saving = true);
+      final db = DatabaseHelper.instance;
+      // Unlink tagged transactions first to satisfy foreign key constraints
+      await db.update('transactions', {'trip_id': null}, where: 'trip_id = ?', whereArgs: [widget.trip!.id]);
+      await db.delete('trips', where: 'id = ?', whereArgs: [widget.trip!.id]);
+      widget.onSaved();
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   Future<void> _save() async {

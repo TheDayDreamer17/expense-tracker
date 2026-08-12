@@ -53,7 +53,16 @@ class IndianTaxEngine {
       return 0.0;
     }
 
-    final double baseTax = calculateProgressiveTax(taxableIncome, newRegimeSlabs);
+    double baseTax = calculateProgressiveTax(taxableIncome, newRegimeSlabs);
+    
+    // Marginal relief under Section 87A for New Regime (Tax payable cannot exceed income exceeding ₹7,00,000)
+    if (taxableIncome > 700000) {
+      final double excessIncome = taxableIncome - 700000;
+      if (baseTax > excessIncome) {
+        baseTax = excessIncome;
+      }
+    }
+
     final double cess = baseTax * 0.04; // 4% Health and Education Cess
     return baseTax + cess;
   }

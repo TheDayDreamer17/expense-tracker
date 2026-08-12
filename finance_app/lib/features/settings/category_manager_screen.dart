@@ -228,13 +228,16 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> w
       if (isParent) {
         final children = _categories.where((c) => c.parentId == category.id).toList();
         for (final child in children) {
+          await db.delete('budgets', where: 'category_id = ?', whereArgs: [child.id]);
           await db.update('transactions', {'category_id': fallbackId}, where: 'category_id = ?', whereArgs: [child.id]);
           await db.delete('categories', where: 'id = ?', whereArgs: [child.id]);
         }
         
+        await db.delete('budgets', where: 'category_id = ?', whereArgs: [category.id]);
         await db.update('transactions', {'category_id': fallbackId}, where: 'category_id = ?', whereArgs: [category.id]);
         await db.delete('categories', where: 'id = ?', whereArgs: [category.id]);
       } else {
+        await db.delete('budgets', where: 'category_id = ?', whereArgs: [category.id]);
         await db.update('transactions', {'category_id': fallbackId}, where: 'category_id = ?', whereArgs: [category.id]);
         await db.delete('categories', where: 'id = ?', whereArgs: [category.id]);
       }

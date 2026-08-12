@@ -100,17 +100,11 @@ class TransactionService {
     await db.transaction((txn) async {
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      // 1. Delete row
-      await txn.delete('transactions', where: 'id = ?', whereArgs: [tx.id]);
+      // 1. Delete any existing audit logs referencing this transaction to satisfy foreign keys
+      await txn.delete('audit_logs', where: 'transaction_id = ?', whereArgs: [tx.id]);
 
-      // 2. Insert audit log
-      await txn.insert('audit_logs', {
-        'id': const Uuid().v4(),
-        'transaction_id': tx.id,
-        'action': 'DELETE',
-        'before_data': tx.toMap().toString(),
-        'created_at': now,
-      });
+      // 2. Delete transaction row
+      await txn.delete('transactions', where: 'id = ?', whereArgs: [tx.id]);
 
       // 3. Reverse balances (if not template)
       if (!tx.isTemplate) {

@@ -808,7 +808,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
         categoryId: _selectedCategoryId,
         amount: amount,
         type: _type,
-        date: DateTime.fromMillisecondsSinceEpoch(now),
+        date: widget.parsed.timestamp ?? DateTime.fromMillisecondsSinceEpoch(now),
         note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),

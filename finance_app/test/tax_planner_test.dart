@@ -11,6 +11,15 @@ void main() {
       expect(IndianTaxEngine.computeNewRegime(500000), 0.0);
     });
 
+    test('New Regime - Section 87A Marginal Relief for income slightly above 7 Lakhs', () {
+      // Gross 7,85,000. Standard deduction = 75,000. Taxable income = 7,10,000.
+      // Normal base tax would be: 20,000 (3L-7L @ 5%) + 1,000 (7L-7.1L @ 10%) = 21,000.
+      // Excess income over 7,00,000 = 10,000.
+      // Marginal relief caps base tax to 10,000.
+      // Total tax with 4% cess = 10,000 + 400 = 10,400.
+      expect(IndianTaxEngine.computeNewRegime(785000), 10400.0);
+    });
+
     test('New Regime - Progressive taxation above rebate limit', () {
       // Gross 10,75,000. Less 75,000 standard deduction = 10,00,000 taxable.
       // Slabs:

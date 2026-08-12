@@ -306,9 +306,18 @@ class _NWEntrySheetState extends State<_NWEntrySheet> {
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            Text(widget.existing == null ? 'Add Entry' : 'Update Entry',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.existing == null ? 'Add Entry' : 'Update Entry',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                if (widget.existing != null)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: AppColors.expense),
+                    onPressed: _saving ? null : _delete,
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
             SegmentedButton<String>(
               segments: const [
@@ -354,14 +363,51 @@ class _NWEntrySheetState extends State<_NWEntrySheet> {
     );
   }
 
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Entry'),
+        content: Text('Are you sure you want to delete all records for "${widget.existing!.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.expense),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && widget.existing != null) {
+      setState(() => _saving = true);
+      await DatabaseHelper.instance.delete('net_worth_entries', where: 'name = ?', whereArgs: [widget.existing!.name]);
+      widget.onSaved();
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty || _amountCtrl.text.isEmpty) return;
+    final newName = _nameCtrl.text.trim();
+    if (newName.isEmpty || _amountCtrl.text.isEmpty) return;
     setState(() => _saving = true);
+
+    // If renamed, update past historical snapshots to prevent orphan duplicate entries
+    if (widget.existing != null && widget.existing!.name != newName) {
+      await DatabaseHelper.instance.update(
+        'net_worth_entries',
+        {'name': newName},
+        where: 'name = ?',
+        whereArgs: [widget.existing!.name],
+      );
+    }
+
     await DatabaseHelper.instance.insert('net_worth_entries', {
       'id': const Uuid().v4(),
       'entry_type': _type,
       'sub_type': _subType,
-      'name': _nameCtrl.text.trim(),
+      'name': newName,
       'amount': double.tryParse(_amountCtrl.text) ?? 0,
       'date': DateTime.now().millisecondsSinceEpoch,
     });
