@@ -9,6 +9,7 @@ import '../../core/utils/formatters.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/transaction_service.dart';
+import '../../core/models/transaction_model.dart';
 
 
 class SmsScannerScreen extends ConsumerStatefulWidget {
