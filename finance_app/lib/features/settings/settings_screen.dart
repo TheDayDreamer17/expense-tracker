@@ -82,19 +82,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           _SectionHeader('Appearance'),
           _SettingCard(children: [
-            _SettingRow(
-              icon: Icons.palette_outlined,
-              label: 'Theme',
-              trailing: SegmentedButton<ThemeMode>(
-                segments: const [
-                  ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-                  ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
-                  ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.palette_outlined, color: AppColors.primary, size: 22),
+                      SizedBox(width: 12),
+                      Text('App Theme', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined, size: 16), label: Text('Light')),
+                        ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.settings_suggest_outlined, size: 16), label: Text('Auto')),
+                        ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined, size: 16), label: Text('Dark')),
+                      ],
+                      selected: {themeMode},
+                      onSelectionChanged: (s) =>
+                          ref.read(themeModeProvider.notifier).setTheme(s.first),
+                    ),
+                  ),
                 ],
-                selected: {themeMode},
-                onSelectionChanged: (s) =>
-                    ref.read(themeModeProvider.notifier).setTheme(s.first),
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
               ),
             ),
           ]),
@@ -177,7 +191,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SettingRow(
               icon: Icons.percent,
               label: 'Tax Planner & Advisor',
-              subtitle: 'Compare Old vs New Regimes and parse Zerodha capital gains',
+              subtitle: 'Compare Old vs New Regimes for Tax Optimization',
               onTap: () => Navigator.pushNamed(context, '/tax-planner'),
             ),
           ]),

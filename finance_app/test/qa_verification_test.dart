@@ -31,6 +31,20 @@ void main() {
       expect(parsed.accountLast4, equals('4321'));
     });
 
+    test('Filters out Home Loan balance check SMS correctly (Not a transaction)', () {
+      const body = 'Dear Customer, please ensure sufficient balance of Rs 25,000.00 in your A/C XX9012 for Home Loan EMI scheduled on 10-Sep-26.';
+      final parsed = SmsParser.parse('HDFCBK', body);
+      
+      expect(parsed, isNull);
+    });
+
+    test('Filters out Insurance due date reminder SMS correctly (Not a transaction)', () {
+      const body = 'Reminder: Premium of Rs 4,500.00 for Policy 981273 is due on 12-Sep-26. Keep funds ready.';
+      final parsed = SmsParser.parse('ICICIB', body);
+      
+      expect(parsed, isNull);
+    });
+
     test('Parses zero amount SMS without crash (ignores zero rupee auth messages)', () {
       const body = 'A/C XX1234 debited by Rs 0.00 for test authorization.';
       final parsed = SmsParser.parse('SBIIN', body);

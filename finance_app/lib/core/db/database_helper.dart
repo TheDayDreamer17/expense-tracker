@@ -363,13 +363,9 @@ class DatabaseHelper {
 
     // Default accounts
     final accounts = [
-      {'id': 'acc_cash', 'name': 'Cash', 'type': 'CASH', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF4CAF50, 'icon': 'wallet', 'created_at': now, 'updated_at': now},
-      {'id': 'acc_sbi', 'name': 'SBI', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF2196F3, 'icon': 'bank', 'created_at': now, 'updated_at': now},
-      {'id': 'acc_hdfc', 'name': 'HDFC', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF3F51B5, 'icon': 'bank', 'created_at': now, 'updated_at': now},
-      {'id': 'acc_icici', 'name': 'ICICI', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF00BCD4, 'icon': 'bank', 'created_at': now, 'updated_at': now},
-      {'id': 'acc_pnb', 'name': 'PNB', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFFFF5722, 'icon': 'bank', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_cash', 'name': 'Cash Wallet', 'type': 'CASH', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF4CAF50, 'icon': 'wallet', 'created_at': now, 'updated_at': now},
+      {'id': 'acc_bank', 'name': 'Primary Bank', 'type': 'BANK', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF2196F3, 'icon': 'bank', 'created_at': now, 'updated_at': now},
       {'id': 'acc_cc', 'name': 'Credit Card', 'type': 'CREDIT_CARD', 'balance': 0.0, 'currency': 'INR', 'color': 0xFFE91E63, 'icon': 'card', 'created_at': now, 'updated_at': now},
-      {'id': 'acc_investments', 'name': 'Investments', 'type': 'INVESTMENT', 'balance': 0.0, 'currency': 'INR', 'color': 0xFF4CAF50, 'icon': 'chart', 'created_at': now, 'updated_at': now},
     ];
     for (final a in accounts) {
       await db.insert('accounts', a);

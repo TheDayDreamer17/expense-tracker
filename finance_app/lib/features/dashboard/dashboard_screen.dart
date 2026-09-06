@@ -9,6 +9,7 @@ import '../../core/models/models.dart';
 import '../../core/models/transaction_model.dart';
 import '../../core/providers/refresh_provider.dart';
 import '../../core/providers/settings_provider.dart';
+import '../auth/sms_scanner_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -233,18 +234,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       GestureDetector(
-                        onTap: () => _showNameDialog(context, settings.userName),
+                        onTap: () => _showProfileHubModal(context, settings.userName),
                         child: Text(
                           '$_greeting, ${settings.userName.isNotEmpty ? settings.userName : "Friend"}',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.lightTextSecondary),
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => _showNameDialog(context, settings.userName),
+                        onTap: () => _showProfileHubModal(context, settings.userName),
                         child: CircleAvatar(
                           radius: 18,
-                          backgroundColor: AppColors.primary.withOpacity(0.08),
-                          child: const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          child: const Icon(Icons.person, color: AppColors.primary, size: 20),
                         ),
                       ),
                     ],
@@ -524,6 +525,96 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showProfileHubModal(BuildContext context, String currentName) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.primary.withOpacity(0.12),
+                    child: const Icon(Icons.person, color: AppColors.primary, size: 30),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentName.isNotEmpty ? currentName : 'Orbit User',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2),
+                        Text('$_greeting 👋', style: const TextStyle(fontSize: 12, color: AppColors.lightTextSecondary)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                    tooltip: 'Edit Name',
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showNameDialog(context, currentName);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              
+              // Quick Shortcuts Grid
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _hubShortcut(ctx, Icons.settings_outlined, 'Settings', () => Navigator.pushNamed(context, '/settings')),
+                  _hubShortcut(ctx, Icons.bar_chart_rounded, 'Reports', () => Navigator.pushNamed(context, '/reports')),
+                  _hubShortcut(ctx, Icons.sms_outlined, 'SMS Scan', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SmsScannerScreen()))),
+                  _hubShortcut(ctx, Icons.account_balance_outlined, 'Accounts', () => Navigator.pushNamed(context, '/accounts')),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text('Orbit Finance v1.0.0', style: TextStyle(fontSize: 11, color: AppColors.lightTextSecondary)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _hubShortcut(BuildContext ctx, IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(ctx);
+        onTap();
+      },
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

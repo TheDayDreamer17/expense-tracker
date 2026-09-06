@@ -386,6 +386,7 @@ class ParsedSmsTransaction {
   final bool isCreditCard;
   final String? cardName;
   final DateTime? timestamp;
+  DateTime get date => timestamp ?? DateTime.now();
 
   const ParsedSmsTransaction({
     this.id,

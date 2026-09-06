@@ -302,58 +302,6 @@ Calculated Liabilities:
                   ),
                   const SizedBox(height: 20),
 
-                  // Zerodha Import
-                  Card(
-                    color: cardBg,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.analytics_outlined, color: AppColors.primary),
-                              SizedBox(width: 8),
-                              Text('Zerodha Console Import', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Upload your Kite/Coin realized P&L or Capital Gains CSV report to automatically populate stock and mutual fund short/long term capital gains.',
-                            style: TextStyle(fontSize: 11, color: AppColors.lightTextSecondary),
-                          ),
-                          const SizedBox(height: 12),
-                          if (_importedFileName != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(color: AppColors.success.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-                              child: Row(children: [
-                                const Icon(Icons.check_circle_outline, color: AppColors.success, size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '$_importedFileName ($_importedTradeCount entries parsed)',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ]),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: _pickZerodhaCsv,
-                              icon: const Icon(Icons.file_open_outlined, size: 18),
-                              label: Text(_importedFileName == null ? 'Select Zerodha CSV' : 'Replace Statement'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 16),
 
                   // Income Card

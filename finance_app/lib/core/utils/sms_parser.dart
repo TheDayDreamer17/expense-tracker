@@ -98,9 +98,39 @@ class SmsParser {
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
+  static const _nonTransactionPhrases = [
+    'ensure sufficient balance',
+    'check if account has',
+    'check account',
+    'enough fund',
+    'enough balance',
+    'maintain sufficient balance',
+    'maintain balance',
+    'keep funds ready',
+    'will be debited on',
+    'scheduled for',
+    'scheduled on',
+    'reminder for',
+    'due date is',
+    'is due on',
+    'due on',
+    'auto debit reminder',
+    'balance check',
+    'insufficient balance',
+    'standing instruction',
+    'payment due',
+    'upcoming payment',
+    'please ensure',
+  ];
+
   /// Returns null if the SMS is not a transaction message.
   static ParsedSmsTransaction? parse(String sender, String body) {
     if (!_isBankSender(sender)) return null;
+
+    final lowerBody = body.toLowerCase();
+    for (final phrase in _nonTransactionPhrases) {
+      if (lowerBody.contains(phrase)) return null;
+    }
 
     final amountMatch = _amountRe.firstMatch(body);
     if (amountMatch == null) return null;
@@ -154,7 +184,6 @@ class SmsParser {
 
     final category = _detectCategory(merchant ?? body);
 
-    final lowerBody = body.toLowerCase();
     final lowerSender = sender.toLowerCase();
     final isCreditCard = lowerBody.contains('credit card') ||
         lowerBody.contains('spent on card') ||
