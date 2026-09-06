@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.thedaydreamer.orbit"
+    namespace = "com.example.finance_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
