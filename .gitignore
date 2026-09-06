@@ -3,7 +3,10 @@
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
+# Builds
 build/
+builds/
+*.apk
 *.iml
 
 # Android
