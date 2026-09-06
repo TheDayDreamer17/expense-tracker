@@ -527,6 +527,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
     );
   }
+
+  void _showNameDialog(BuildContext context, String currentName) {
+    final controller = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('What is your name?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Enter your name',
+            labelText: 'Your Name',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(settingsProvider.notifier).setUserName(controller.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TxListItem extends StatelessWidget {
@@ -644,37 +676,5 @@ class _TxListItem extends StatelessWidget {
       'cat_gift': '🎁',
     };
     return map[id] ?? '💸';
-  }
-
-  void _showNameDialog(BuildContext context, String currentName) {
-    final controller = TextEditingController(text: currentName);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('What is your name?'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Enter your name',
-            labelText: 'Your Name',
-          ),
-          textCapitalization: TextCapitalization.words,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ref.read(settingsProvider.notifier).setUserName(controller.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
   }
 }
