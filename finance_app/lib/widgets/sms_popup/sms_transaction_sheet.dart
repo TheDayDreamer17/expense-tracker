@@ -35,7 +35,6 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
   bool _hasPrompted = false;
 
   List<CategoryModel> _categories = [];
-  bool _loadingCategories = true;
   String _lastCheckedMerchant = '';
 
   @override
@@ -71,16 +70,9 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
       if (mounted) {
         setState(() {
           _categories = categories;
-          _loadingCategories = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadingCategories = false;
-        });
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadLearnedCategory() async {
@@ -713,6 +705,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
               orElse: () => const CategoryModel(id: '', name: 'Selected Category', type: '', icon: '❓', color: 0),
             );
 
+            if (!mounted) return;
             final confirm = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -748,6 +741,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
     }
 
     // Check Credit Card custom warning limit threshold
+    if (_accounts.isEmpty) return;
     final selectedAcc = _accounts.firstWhere((a) => a.id == _selectedAccountId, orElse: () => _accounts.first);
     if (selectedAcc.type == 'CREDIT_CARD') {
       final prefs = await SharedPreferences.getInstance();
@@ -759,6 +753,7 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
       
       final threshold = warningThreshold ?? (limit > 0 ? limit : null);
       if (threshold != null && projected >= threshold) {
+        if (!mounted) return;
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(

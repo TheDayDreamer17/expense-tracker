@@ -129,7 +129,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           _selectedAccountId = _accounts.first.id;
         }
         if (_selectedToAccountId == null && _accounts.length > 1) {
-          _selectedToAccountId = _accounts.firstWhere((a) => a.id != _selectedAccountId).id;
+          _selectedToAccountId = _accounts.firstWhere((a) => a.id != _selectedAccountId, orElse: () => _accounts.first).id;
         }
       });
     }
@@ -244,8 +244,8 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                         onChanged: (v) {
                           setState(() {
                             _selectedAccountId = v!;
-                            if (_selectedToAccountId == _selectedAccountId) {
-                              _selectedToAccountId = _accounts.firstWhere((a) => a.id != _selectedAccountId).id;
+                            if (_selectedToAccountId == _selectedAccountId && _accounts.isNotEmpty) {
+                              _selectedToAccountId = _accounts.firstWhere((a) => a.id != _selectedAccountId, orElse: () => _accounts.first).id;
                             }
                           });
                         },

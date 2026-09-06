@@ -100,7 +100,7 @@ class _SmsScannerScreenState extends ConsumerState<SmsScannerScreen> {
         }
       }
       
-      if (targetAccountId == 'acc_bank') {
+      if (targetAccountId == 'acc_bank' && accounts.isNotEmpty) {
         if (r.parsed.isCreditCard) {
           final anyCc = accounts.firstWhere((a) => a.type == 'CREDIT_CARD', orElse: () => accounts.first);
           targetAccountId = anyCc.id;

@@ -227,7 +227,6 @@ class _InsightsCarouselState extends ConsumerState<InsightsCarousel> {
   Widget _buildOverviewSlide() {
     final net = _income - _expense;
     final pct = _income > 0 ? (_expense / _income).clamp(0.0, 1.0) : 0.0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return _SlideCard(
       title: 'Monthly Overview',
@@ -534,7 +533,6 @@ class _SlideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? AppColors.darkCard : Colors.white;
-    final textTheme = Theme.of(context).textTheme;
 
     return GestureDetector(
       onTap: onTap,
