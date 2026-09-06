@@ -69,7 +69,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       color: AppColors.lightTextSecondary, fontSize: 12)),
             ]),
           ).animate().fadeIn(),
-          const SizedBox(height: 24),
+          _SectionHeader('Profile & Identity'),
+          _SettingCard(children: [
+            _SettingRow(
+              icon: Icons.person_outline,
+              label: 'Your Name',
+              subtitle: settings.userName.isNotEmpty ? settings.userName : 'Tap to set name',
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => _editUserNameDialog(context, settings.userName),
+            ),
+          ]),
 
           _SectionHeader('Appearance'),
           _SettingCard(children: [
@@ -420,6 +429,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           },
         );
       },
+    );
+  void _editUserNameDialog(BuildContext context, String currentName) {
+    final controller = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update Your Name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Enter your name',
+            labelText: 'Your Name',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(settingsProvider.notifier).setUserName(controller.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 

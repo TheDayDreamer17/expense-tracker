@@ -41,6 +41,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 
 // ─── Settings model ────────────────────────────────────────────────────────
 class AppSettings {
+  final String userName;
   final String currency;
   final String currencySymbol;
   final String defaultAccountId;
@@ -57,6 +58,7 @@ class AppSettings {
   final String? aiModel;
 
   const AppSettings({
+    this.userName = '',
     this.currency = 'INR',
     this.currencySymbol = '₹',
     this.defaultAccountId = 'acc_cash',
@@ -74,6 +76,7 @@ class AppSettings {
   });
 
   AppSettings copyWith({
+    String? userName,
     String? currency, String? currencySymbol, String? defaultAccountId,
     bool? incomeReminderEnabled, String? incomeReminderTime,
     bool? pinEnabled, bool? biometricEnabled, bool? onboardingDone,
@@ -81,6 +84,7 @@ class AppSettings {
     String? aiProvider, String? aiApiKey, String? aiCustomEndpoint, String? aiModel,
   }) {
     return AppSettings(
+      userName: userName ?? this.userName,
       currency: currency ?? this.currency,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       defaultAccountId: defaultAccountId ?? this.defaultAccountId,
@@ -134,6 +138,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     }
 
     state = AppSettings(
+      userName: prefs.getString('user_name') ?? '',
       currency: prefs.getString('currency') ?? 'INR',
       currencySymbol: prefs.getString('currency_symbol') ?? '₹',
       defaultAccountId: prefs.getString('default_account') ?? 'acc_cash',
@@ -151,9 +156,17 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     );
   }
 
+  Future<void> setUserName(String name) async {
+    final trimmed = name.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', trimmed);
+    state = state.copyWith(userName: trimmed);
+  }
+
   Future<void> update(AppSettings updated) async {
     state = updated;
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', updated.userName);
     await prefs.setString('currency', updated.currency);
     await prefs.setString('currency_symbol', updated.currencySymbol);
     await prefs.setString('default_account', updated.defaultAccountId);

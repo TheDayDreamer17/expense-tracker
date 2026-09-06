@@ -232,12 +232,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '$_greeting, Tanmay',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.lightTextSecondary),
+                      GestureDetector(
+                        onTap: () => _showNameDialog(context, settings.userName),
+                        child: Text(
+                          '$_greeting, ${settings.userName.isNotEmpty ? settings.userName : "Friend"}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.lightTextSecondary),
+                        ),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/settings'),
+                        onTap: () => _showNameDialog(context, settings.userName),
                         child: CircleAvatar(
                           radius: 18,
                           backgroundColor: AppColors.primary.withOpacity(0.08),
@@ -641,5 +644,37 @@ class _TxListItem extends StatelessWidget {
       'cat_gift': '🎁',
     };
     return map[id] ?? '💸';
+  }
+
+  void _showNameDialog(BuildContext context, String currentName) {
+    final controller = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('What is your name?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Enter your name',
+            labelText: 'Your Name',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(settingsProvider.notifier).setUserName(controller.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 }
