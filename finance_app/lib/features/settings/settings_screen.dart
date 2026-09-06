@@ -430,6 +430,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       },
     );
+  }
+
   void _editUserNameDialog(BuildContext context, String currentName) {
     final controller = TextEditingController(text: currentName);
     showDialog(
