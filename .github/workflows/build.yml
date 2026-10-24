@@ -22,7 +22,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
           channel: 'stable'
           cache: true
 
@@ -58,7 +57,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
           channel: 'stable'
           cache: true
 
@@ -85,3 +83,4 @@ jobs:
         with:
           name: expense-tracker-ios-ipa
           path: finance_app/build/ios/ipa/expense_tracker.ipa
+

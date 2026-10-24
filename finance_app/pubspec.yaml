@@ -16,7 +16,6 @@ dependencies:
 
   # State management
   flutter_riverpod: ^2.5.1
-  riverpod_annotation: ^2.3.5
 
   # SMS
   flutter_sms_inbox: ^1.0.4
@@ -60,8 +59,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-  build_runner: ^2.4.11
-  riverpod_generator: ^2.4.3
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
