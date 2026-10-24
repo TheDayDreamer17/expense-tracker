@@ -8,16 +8,19 @@ class SmsParser {
   static const _bankSenders = [
     'HDFCBK', 'HDFCBN', 'HDFC',
     'SBIINB', 'SBIPSG', 'SBIUPI', 'SBI',
-    'ICICIB', 'ICICI',
+    'ICICIB', 'ICICI', 'ICICIT', 'ICICIO',
     'AXISBK', 'AXISBN', 'AXIS',
     'KOTAKB', 'KOTAK',
     'YESBK', 'YESBNK',
-    'INDUSB', 'IDFCFB',
+    'INDUSB', 'IDFCFB', 'IDFC',
     'PNBSMS', 'BOBSMS', 'CANBNK',
+    'FDRL', 'FEDERAL', 'SCAPIA',
+    'RBLBNK', 'RBL', 'AUBANK',
     'PAYTM', 'PYTMBN',
     'GPAY', 'PHONEPE', 'BHIMUPI',
     'AMAZON', 'AMZNPAY',
     'CREDCL', 'CRED',
+    'ONECRD', 'JIO',
   ];
 
   // ─── Regex patterns ────────────────────────────────────────────────────────
@@ -26,11 +29,11 @@ class SmsParser {
     caseSensitive: false,
   );
   static final _typeDebitRe = RegExp(
-    r'\b(debited|debit|spent|paid|withdrawn|purchase|payment)\b',
+    r'\b(debited|debit|spent|paid|withdrawn|purchase|payment|charged|used\s+for|txn\s+of|transaction\s+of|sent\s+to|sent)\b',
     caseSensitive: false,
   );
   static final _typeCreditRe = RegExp(
-    r'\b(credited|credit|received|deposited|refund|cashback)\b',
+    r'(?:\bcredited\b|\breceived\b|\bdeposited\b|\brefund\b|\bcashback\b|\bcredit\s+(?:of|to|with|in)\b|\bcredited\s+with\b|\bcredit\b(?!\s*(?:card|limit|line|score|points|rating|facility|account)))',
     caseSensitive: false,
   );
   static final _acctRe = RegExp(
@@ -38,7 +41,11 @@ class SmsParser {
     caseSensitive: false,
   );
   static final _merchantRe = RegExp(
-    r'(?:\bat\b|\bto\b|\btowards\b|\bfor\b|\bfrom\b|\bby\b)\s+([A-Za-z0-9@.\-_ &]{3,40}?)(?:\s+on|\s+via|\s+ref|\s+upi|[.\n,]|$)',
+    r'(?:\bat\b|\bto\b|\btowards\b|\bfrom\b|\bby\b)\s+([A-Za-z0-9@.\-_ &]{2,40}?)(?:\s+on|\s+via|\s+ref|\s+upi|[.\n,]|$)',
+    caseSensitive: false,
+  );
+  static final _iciciMerchantRe = RegExp(
+    r'\bon\s+\d{1,2}-[A-Za-z]{3}-\d{2,4}\s+on\s+([A-Za-z0-9@.\-_ &]{2,40}?)(?:\.|\s+avl|\s+limit|\s+if\b|$)',
     caseSensitive: false,
   );
   static final _balanceRe = RegExp(
@@ -52,16 +59,22 @@ class SmsParser {
       'swiggy', 'zomato', 'dominos', 'domino', 'pizza', 'kfc', 'mcdonalds',
       'mcd', 'burger', 'restaurant', 'cafe', 'coffee', 'starbucks',
       'eatclub', 'box8', 'freshmenu', 'faasos', 'biryani', 'hotel',
+      'swish', 'munchmart', 'eatery', 'bakery', 'tea', 'chai',
     ],
     'cat_grocery': [
       'bigbasket', 'blinkit', 'zepto', 'dmart', 'grofers', 'jiomart',
       'supermarket', 'grocery', 'reliance fresh', 'more supermarket',
-      'spencers', 'nature basket', 'lulu', 'easyday',
+      'spencers', 'nature basket', 'lulu', 'easyday', 'instamart',
+      'avenue e commer', 'avenue supermarts',
+    ],
+    'cat_telecom': [
+      'airtel', 'jio', 'bsnl', 'vodafone', 'vi ', 'recharge',
+      'mobile bill', 'broadband', 'dtv', 'dth', 'tata sky', 'act fibernet',
     ],
     'cat_transport': [
       'uber', 'ola', 'rapido', 'metro', 'irctc', 'railway', 'redbus',
       'makemytrip', 'yatra', 'cleartrip', 'indigo', 'airindia',
-      'spicejet', 'goair', 'vistara', 'petrol', 'fuel', 'parking',
+      'spicejet', 'goair', 'vistara', 'petrol', 'fuel', 'parking', 'toll',
     ],
     'cat_shopping': [
       'amazon', 'flipkart', 'myntra', 'meesho', 'nykaa', 'ajio',
@@ -82,55 +95,34 @@ class SmsParser {
       'electricity', 'bescom', 'msedcl', 'tata power', 'adani electric',
       'water', 'gas', 'piped gas', 'mgl', 'igl', 'mahanagar gas',
     ],
-    'cat_telecom': [
-      'airtel', 'jio', 'bsnl', 'vodafone', 'vi ', 'recharge',
-      'mobile bill', 'broadband', 'dtv', 'dth', 'tata sky',
+    'cat_subscription': [
+      'subscription', 'membership', 'annual fee', 'renewal',
+      'chatgpt', 'openai', 'github', 'adobe', 'microsoft',
     ],
     'cat_education': [
       'udemy', 'coursera', 'byju', 'unacademy', 'vedantu', 'toppr',
       'college', 'school', 'university', 'tuition', 'fees',
     ],
-    'cat_subscription': [
-      'subscription', 'membership', 'annual fee', 'renewal',
-      'chatgpt', 'openai', 'github', 'adobe', 'microsoft',
+    'cat_financial': [
+      'emi', 'loan', 'interest', 'late fee', 'bounce', 'penal',
+      'credit card bill', 'billdesk', 'cred',
     ],
   };
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
-  static const _nonTransactionPhrases = [
-    'ensure sufficient balance',
-    'check if account has',
-    'check account',
-    'enough fund',
-    'enough balance',
-    'maintain sufficient balance',
-    'maintain balance',
-    'keep funds ready',
-    'will be debited on',
-    'scheduled for',
-    'scheduled on',
-    'reminder for',
-    'due date is',
-    'is due on',
-    'due on',
-    'auto debit reminder',
-    'balance check',
-    'insufficient balance',
-    'standing instruction',
-    'payment due',
-    'upcoming payment',
-    'please ensure',
-  ];
+  static final _nonTransactionRe = RegExp(
+    r'\b(one[- ]time password|one[- ]time passcode|otps?|verification code|secret\.? do not disclose|never share|do not share|valid for \d+ min)\b|'
+    r'\b(increase limit|spending power|for free|pre[- ]approved|apply now|upgrade (?:your )?limit|loan offer|eligible for|enjoy more spending power)\b|'
+    r'\b(ensure sufficient balance|maintain balance|will be debited on|scheduled for|scheduled on|reminder for|is due on|due on|auto debit reminder|payment due|upcoming payment)\b',
+    caseSensitive: false,
+  );
 
   /// Returns null if the SMS is not a transaction message.
   static ParsedSmsTransaction? parse(String sender, String body) {
     if (!_isBankSender(sender)) return null;
 
-    final lowerBody = body.toLowerCase();
-    for (final phrase in _nonTransactionPhrases) {
-      if (lowerBody.contains(phrase)) return null;
-    }
+    if (_nonTransactionRe.hasMatch(body)) return null;
 
     final amountMatch = _amountRe.firstMatch(body);
     if (amountMatch == null) return null;
@@ -143,15 +135,40 @@ class SmsParser {
     final isCredit = _typeCreditRe.hasMatch(body);
     if (!isDebit && !isCredit) return null; // Not a clear transaction
 
-    // Prioritize EXPENSE if both exist (e.g., "spent on credit card")
-    final type = isDebit ? 'EXPENSE' : 'INCOME';
+    final String type;
+    if (isDebit && isCredit) {
+      final lower = body.toLowerCase();
+      if (lower.contains('refund') || lower.contains('cashback') || lower.contains('credited')) {
+        type = 'INCOME';
+      } else {
+        type = 'EXPENSE';
+      }
+    } else if (isDebit) {
+      type = 'EXPENSE';
+    } else {
+      type = 'INCOME';
+    }
+
     final acct = _acctRe.firstMatch(body)?.group(1);
     final balRaw = _balanceRe.firstMatch(body)?.group(1)?.replaceAll(',', '');
     final balance = balRaw != null ? double.tryParse(balRaw) : null;
 
-    String? merchant = _merchantRe.firstMatch(body)?.group(1)?.trim();
-    if (merchant != null && (RegExp(r'^\d+$').hasMatch(merchant) || merchant.toLowerCase().contains('block') || merchant.toLowerCase().contains('no.'))) {
-      merchant = null;
+    String? merchant = _iciciMerchantRe.firstMatch(body)?.group(1)?.trim() ??
+        _merchantRe.firstMatch(body)?.group(1)?.trim();
+
+    if (merchant != null) {
+      final clean = merchant.trim();
+      final lower = clean.toLowerCase();
+      if (RegExp(r'^(?:inr|rs|₹)?\s*[\d,.]+$').hasMatch(lower) ||
+          lower.contains('block') ||
+          lower.contains('no.') ||
+          lower.startsWith('avl') ||
+          lower.startsWith('bal') ||
+          clean.length < 2) {
+        merchant = null;
+      } else {
+        merchant = clean;
+      }
     }
 
     if (merchant == null || merchant.isEmpty) {
@@ -184,13 +201,14 @@ class SmsParser {
 
     final category = _detectCategory(merchant ?? body);
 
+    final lowerBody = body.toLowerCase();
     final lowerSender = sender.toLowerCase();
     final isCreditCard = lowerBody.contains('credit card') ||
         lowerBody.contains('spent on card') ||
         lowerBody.contains('card ending') ||
         lowerSender.contains('card') ||
         lowerSender.contains('crd') ||
-        (lowerBody.contains('card') && isDebit);
+        (lowerBody.contains('card') && type == 'EXPENSE');
 
     String? cardName;
     if (isCreditCard) {
@@ -202,6 +220,8 @@ class SmsParser {
         cardName = 'ICICI Card';
       } else if (lowerSender.contains('axis') || lowerBody.contains('axis')) {
         cardName = 'Axis Card';
+      } else if (lowerSender.contains('scapia') || lowerBody.contains('scapia')) {
+        cardName = 'Scapia Federal Card';
       } else {
         cardName = 'Credit Card';
       }
@@ -234,10 +254,15 @@ class SmsParser {
   // ─── Private helpers ───────────────────────────────────────────────────────
 
   static bool _isBankSender(String sender) {
-    // TEMPORARY: Allow all senders so Android Emulator testing works!
-    return true; 
-    // final upper = sender.toUpperCase();
-    // return _bankSenders.any((s) => upper.contains(s));
+    if (sender.isEmpty) return true; // Allow local testing without sender
+    final upper = sender.toUpperCase();
+    // Exclude direct commercial delivery apps so order tracking SMS are not parsed as bank debits
+    if (upper.contains('ZOMATO') || upper.contains('SWIGGY') || upper.contains('ZEPTO') || upper.contains('BLINKIT')) {
+      return false;
+    }
+    // Allow test phone numbers from emulator
+    if (RegExp(r'^\+?\d+$').hasMatch(sender)) return true;
+    return _bankSenders.any((s) => upper.contains(s));
   }
 
   static String _detectCategory(String text) {

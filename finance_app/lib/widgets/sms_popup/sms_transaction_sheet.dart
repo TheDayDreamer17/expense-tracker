@@ -70,6 +70,14 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
       if (mounted) {
         setState(() {
           _categories = categories;
+          final match = _categories.any((c) => c.id == _selectedCategoryId);
+          if (!match && _categories.isNotEmpty) {
+            final fallback = _categories.firstWhere(
+              (c) => c.type == _type && c.parentId == null,
+              orElse: () => _categories.first,
+            );
+            _selectedCategoryId = fallback.id;
+          }
         });
       }
     } catch (_) {}
@@ -611,24 +619,31 @@ class _SmsTransactionSheetState extends ConsumerState<SmsTransactionSheet> {
       orElse: () => const CategoryModel(id: '', name: 'Other', type: '', icon: '❓', color: 0),
     );
     if (cat.id.isNotEmpty) {
-      return '${cat.icon} ${cat.name}';
+      final emoji = DatabaseHelper.resolveCategoryEmoji(cat.icon, cat.id);
+      return '$emoji ${cat.name}';
     }
     const names = {
-      'cat_food': '🍕 Food',
+      'cat_food': '🍔 Food & Dining',
       'cat_grocery': '🛒 Groceries',
       'cat_transport': '🚗 Transport',
       'cat_shopping': '🛍️ Shopping',
       'cat_entertainment': '🎬 Entertainment',
-      'cat_health': '💊 Health',
-      'cat_utilities': '⚡ Utilities',
-      'cat_telecom': '📱 Telecom',
+      'cat_health': '💊 Health & Fitness',
+      'cat_utilities': '⚡ Bills & Utilities',
+      'cat_telecom': '📱 Telecom & Recharge',
       'cat_education': '🎓 Education',
-      'cat_subscription': '🔄 Subscription',
-      'cat_other_exp': '❓ Other',
+      'cat_subscription': '🔄 Subscriptions',
+      'cat_financial': '💳 Financial & EMI',
+      'cat_housing': '🏠 Housing & Rent',
+      'cat_personal': '✨ Personal Care',
+      'cat_other_exp': '💸 Miscellaneous',
       'cat_salary': '💰 Salary',
-      'cat_other_inc': '💵 Other Income',
+      'cat_freelance': '💻 Freelancing',
+      'cat_investments_inc': '📈 Investments',
+      'cat_rental_inc': '🏠 Rental Income',
+      'cat_other_inc': '🎁 Other Income',
     };
-    return names[id] ?? '❓ Other';
+    return names[id] ?? '💸 Miscellaneous';
   }
 
   void _pickCategory() {
@@ -862,67 +877,112 @@ class _CategoryPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filteredCategories = categories.where((c) => c.type == type).toList();
+    // Show only root/top-level categories to keep list organized and clean
+    final filteredCategories = categories.where((c) => c.type == type && c.parentId == null).toList();
 
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text('Select Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ...filteredCategories.map((item) {
-              final isSelected = item.id == selected;
-              return GestureDetector(
-                onTap: () => onSelected(item.id),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${item.icon} ${item.name}',
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.primary,
-                      fontWeight: FontWeight.w600, fontSize: 13,
-                    ),
-                  ),
-                ),
-              );
-            }),
-            GestureDetector(
-              onTap: onAddCategory,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary, width: 1.5),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add, size: 16, color: AppColors.primary),
-                    SizedBox(width: 4),
-                    Text(
-                      'Add Custom...',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold, fontSize: 13,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Select ${type == 'EXPENSE' ? 'Expense' : 'Income'} Category',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.45,
+            ),
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 10,
+                children: [
+                  ...filteredCategories.map((item) {
+                    final isSelected = item.id == selected;
+                    final iconEmoji = DatabaseHelper.resolveCategoryEmoji(item.icon, item.id);
+                    return InkWell(
+                      onTap: () => onSelected(item.id),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary : AppColors.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(iconEmoji, style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Text(
+                              item.name,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : AppColors.primary,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  InkWell(
+                    onTap: onAddCategory,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.5),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add, size: 16, color: AppColors.primary),
+                          SizedBox(width: 6),
+                          Text(
+                            'Add Custom...',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-      ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }

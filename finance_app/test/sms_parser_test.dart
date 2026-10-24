@@ -75,5 +75,59 @@ void main() {
 
       expect(result, isNull);
     });
+
+    test('Parses Scapia Federal credit card debit as EXPENSE (not INCOME)', () {
+      const body = 'Hi! Your txn of ₹859.00 at Jio on your Scapia Federal Bank Credit card XX1234 was successful.';
+      const sender = 'SCAPIA';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNotNull);
+      expect(result!.amount, 859.00);
+      expect(result.type, 'EXPENSE');
+      expect(result.suggestedCategory, 'cat_telecom');
+      expect(result.isCreditCard, isTrue);
+    });
+
+    test('Parses ICICI Bank spent SMS with on-date-on-merchant format', () {
+      const body = 'INR 395.00 spent using ICICI Bank Card XX8004 on 09-Sep-26 on MUNCHMART TECHN. Avl Limit: INR 82,111.53.';
+      const sender = 'JD-ICICIT-S';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNotNull);
+      expect(result!.amount, 395.00);
+      expect(result.type, 'EXPENSE');
+      expect(result.merchant, 'MUNCHMART TECHN');
+      expect(result.suggestedCategory, 'cat_food');
+      expect(result.accountLast4, '8004');
+    });
+
+    test('Rejects OTP messages containing Credit Card and amounts', () {
+      const body = '601828 is One-Time Password for INR 395.00 transaction towards MUNCHMART using ICICI Bank Credit Card XX8004. OTPs are SECRET. DO NOT disclose';
+      const sender = 'AD-ICICIO-T';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNull);
+    });
+
+    test('Rejects credit limit extension promotional offers', () {
+      const body = 'Dear Customer, enjoy more spending power! Increase limit on HDFC Bank Credit Card 8163 to Rs.597000 for FREE https://1.hdfc.bank.in/HDFCBK/s/AAZa5qjk';
+      const sender = 'JM-HDFCBK-P';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNull);
+    });
+
+    test('Rejects upcoming EMI debit reminders', () {
+      const body = 'penal charges and Rs 500 bounce charges. EMI will be debited on holidays too. Access your loan related services on iMobile.';
+      const sender = 'JD-ICICIT-S';
+
+      final result = SmsParser.parse(sender, body);
+
+      expect(result, isNull);
+    });
   });
 }

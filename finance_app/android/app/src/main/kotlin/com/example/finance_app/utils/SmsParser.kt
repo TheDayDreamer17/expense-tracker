@@ -6,26 +6,38 @@ import java.util.regex.Pattern
 
 object SmsParser {
     private val amountRe = Pattern.compile("(?:Rs\\.?|INR|₹)\\s?([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
-    private val typeDebitRe = Pattern.compile("\\b(debited|debit|spent|paid|withdrawn|purchase|payment)\\b", Pattern.CASE_INSENSITIVE)
-    private val typeCreditRe = Pattern.compile("\\b(credited|credit|received|deposited|refund|cashback)\\b", Pattern.CASE_INSENSITIVE)
+    private val typeDebitRe = Pattern.compile("\\b(debited|debit|spent|paid|withdrawn|purchase|payment|charged|used\\s+for|txn\\s+of|transaction\\s+of|sent\\s+to|sent)\\b", Pattern.CASE_INSENSITIVE)
+    private val typeCreditRe = Pattern.compile("(?:\\bcredited\\b|\\breceived\\b|\\bdeposited\\b|\\brefund\\b|\\bcashback\\b|\\bcredit\\s+(?:of|to|with|in)\\b|\\bcredited\\s+with\\b|\\bcredit\\b(?!\\s*(?:card|limit|line|score|points|rating|facility|account)))", Pattern.CASE_INSENSITIVE)
     private val acctRe = Pattern.compile("(?:a/c|acct|account|card|ac)(?:\\s+no\\.?|\\s+num\\.?|\\s+number)?[\\s\\*xX]*(\\d{3,4})", Pattern.CASE_INSENSITIVE)
-    private val merchantRe = Pattern.compile("(?:\\bat\\b|\\bto\\b|\\btowards\\b|\\bfor\\b|\\bfrom\\b|\\bby\\b)\\s+([A-Za-z0-9@\\-_ &]{3,40}?)(?:\\s+on|\\s+via|\\s+ref|\\s+upi|[.\\n,]|$)", Pattern.CASE_INSENSITIVE)
+    private val merchantRe = Pattern.compile("(?:\\bat\\b|\\bto\\b|\\btowards\\b|\\bfrom\\b|\\bby\\b)\\s+([A-Za-z0-9@\\-_ &]{2,40}?)(?:\\s+on|\\s+via|\\s+ref|\\s+upi|[.\\n,]|$)", Pattern.CASE_INSENSITIVE)
+    private val iciciMerchantRe = Pattern.compile("\\bon\\s+\\d{1,2}-[A-Za-z]{3}-\\d{2,4}\\s+on\\s+([A-Za-z0-9@\\-_ &]{2,40}?)(?:\\.|\\s+avl|\\s+limit|\\s+if\\b|$)", Pattern.CASE_INSENSITIVE)
     private val balanceRe = Pattern.compile("(?:avl\\.?\\s*bal(?:ance)?|available bal(?:ance)?|bal(?:ance)?[\\s:]*)[\\s:]+(?:Rs\\.?|INR|₹)\\s?([\\d,]+\\.?\\d*)", Pattern.CASE_INSENSITIVE)
     private val upiRefRe = Pattern.compile("(?:upi\\s+ref(?:erence)?(?:\\s+no)?|ref\\s+no|txn\\s+id)[\\s:]*(\\d{12})", Pattern.CASE_INSENSITIVE)
 
+    private val nonTransactionRe = Pattern.compile(
+        "\\b(one[- ]time password|one[- ]time passcode|otps?|verification code|secret\\.? do not disclose|never share|do not share|valid for \\d+ min)\\b|" +
+        "\\b(increase limit|spending power|for free|pre[- ]approved|apply now|upgrade (?:your )?limit|loan offer|eligible for|enjoy more spending power)\\b|" +
+        "\\b(ensure sufficient balance|maintain balance|will be debited on|scheduled for|scheduled on|reminder for|is due on|due on|auto debit reminder|payment due|upcoming payment)\\b",
+        Pattern.CASE_INSENSITIVE
+    )
+
     private val categoryKeywords = mapOf(
-        "cat_food" to listOf("swiggy", "zomato", "dominos", "pizza", "kfc", "mcdonalds", "restaurant", "cafe", "coffee", "starbucks"),
-        "cat_grocery" to listOf("bigbasket", "blinkit", "zepto", "dmart", "grofers", "jiomart", "supermarket", "grocery"),
-        "cat_transport" to listOf("uber", "ola", "rapido", "metro", "irctc", "railway", "redbus", "petrol", "fuel"),
-        "cat_shopping" to listOf("amazon", "flipkart", "myntra", "meesho", "nykaa", "ajio", "decathlon"),
+        "cat_food" to listOf("swiggy", "zomato", "dominos", "pizza", "kfc", "mcdonalds", "restaurant", "cafe", "coffee", "starbucks", "swish", "munchmart", "eatery", "bakery"),
+        "cat_grocery" to listOf("bigbasket", "blinkit", "zepto", "dmart", "grofers", "jiomart", "supermarket", "grocery", "instamart", "avenue e commer"),
+        "cat_transport" to listOf("uber", "ola", "rapido", "metro", "irctc", "railway", "redbus", "petrol", "fuel", "parking", "toll"),
+        "cat_shopping" to listOf("amazon", "flipkart", "myntra", "meesho", "nykaa", "ajio", "decathlon", "croma", "vijaysales"),
         "cat_entertainment" to listOf("netflix", "prime", "hotstar", "disney", "spotify", "youtube", "bookmyshow", "pvr", "inox"),
         "cat_health" to listOf("apollo", "pharmeasy", "1mg", "hospital", "clinic", "doctor", "pharmacy", "medical"),
-        "cat_utilities" to listOf("electricity", "water", "gas"),
-        "cat_telecom" to listOf("airtel", "jio", "bsnl", "vodafone", "recharge"),
-        "cat_subscription" to listOf("subscription", "chatgpt", "openai", "github", "adobe", "microsoft")
+        "cat_utilities" to listOf("electricity", "water", "gas", "bescom", "tata power"),
+        "cat_telecom" to listOf("airtel", "jio", "bsnl", "vodafone", "recharge", "broadband", "dth"),
+        "cat_subscription" to listOf("subscription", "chatgpt", "openai", "github", "adobe", "microsoft"),
+        "cat_financial" to listOf("emi", "loan", "interest", "late fee", "bounce", "penal", "credit card bill", "cred")
     )
 
     fun parse(sender: String, body: String, timestamp: Long): SmsTransaction? {
+        // Drop non-transaction messages (OTPs, promotional limit hikes, debit reminders)
+        if (nonTransactionRe.matcher(body).find()) return null
+
         // Amount check
         val amtMatcher = amountRe.matcher(body)
         if (!amtMatcher.find()) return null
@@ -38,18 +50,41 @@ object SmsParser {
         val isCredit = typeCreditRe.matcher(body).find()
         if (!isDebit && !isCredit) return null
 
-        val type = if (isDebit) "EXPENSE" else "INCOME"
+        val type = if (isDebit && isCredit) {
+            val lower = body.lowercase()
+            if (lower.contains("refund") || lower.contains("cashback") || lower.contains("credited")) "INCOME" else "EXPENSE"
+        } else if (isDebit) {
+            "EXPENSE"
+        } else {
+            "INCOME"
+        }
 
         // Account/Card
         val acctMatcher = acctRe.matcher(body)
         val accountLast4 = if (acctMatcher.find()) acctMatcher.group(1) else null
 
         // Merchant
+        val iciciMatcher = iciciMerchantRe.matcher(body)
         val merMatcher = merchantRe.matcher(body)
-        var merchant = if (merMatcher.find()) merMatcher.group(1)?.trim() else null
+        var merchant = when {
+            iciciMatcher.find() -> iciciMatcher.group(1)?.trim()
+            merMatcher.find() -> merMatcher.group(1)?.trim()
+            else -> null
+        }
 
-        if (merchant != null && (merchant.matches(Regex("^\\d+$")) || merchant.lowercase().contains("block") || merchant.lowercase().contains("no."))) {
-            merchant = null
+        if (merchant != null) {
+            val clean = merchant.trim()
+            val lower = clean.lowercase()
+            if (clean.matches(Regex("^(?:inr|rs|₹)?\\s*[\\d,.]+$", RegexOption.IGNORE_CASE)) ||
+                lower.contains("block") ||
+                lower.contains("no.") ||
+                lower.startsWith("avl") ||
+                lower.startsWith("bal") ||
+                clean.length < 2) {
+                merchant = null
+            } else {
+                merchant = clean
+            }
         }
 
         if (merchant == null || merchant.isEmpty()) {
@@ -102,7 +137,7 @@ object SmsParser {
                 lowerBody.contains("card ending") ||
                 lowerSender.contains("card") ||
                 lowerSender.contains("crd") ||
-                (lowerBody.contains("card") && isDebit)
+                (lowerBody.contains("card") && type == "EXPENSE")
 
         var cardName: String? = null
         if (isCreditCard) {
@@ -111,6 +146,7 @@ object SmsParser {
                 lowerSender.contains("hdfc") || lowerBody.contains("hdfc") -> "HDFC Card"
                 lowerSender.contains("icici") || lowerBody.contains("icici") -> "ICICI Card"
                 lowerSender.contains("axis") || lowerBody.contains("axis") -> "Axis Card"
+                lowerSender.contains("scapia") || lowerBody.contains("scapia") -> "Scapia Federal Card"
                 else -> "Credit Card"
             }
         }

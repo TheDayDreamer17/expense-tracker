@@ -12,34 +12,69 @@ class TransactionService {
     final db = await DatabaseHelper.instance.database;
     await db.transaction((txn) async {
       final now = DateTime.now().millisecondsSinceEpoch;
+
+      // 0. Ensure foreign keys are valid to prevent SQLite foreign key constraint failure (code 787)
+      String? safeCategoryId = tx.categoryId;
+      if (safeCategoryId != null && safeCategoryId.isNotEmpty) {
+        final catExists = await txn.query(
+          'categories',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [safeCategoryId],
+          limit: 1,
+        );
+        if (catExists.isEmpty) {
+          safeCategoryId = tx.isIncome ? 'cat_other_inc' : 'cat_other_exp';
+        }
+      }
+
+      String safeAccountId = tx.accountId;
+      final accExists = await txn.query(
+        'accounts',
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [safeAccountId],
+        limit: 1,
+      );
+      if (accExists.isEmpty) {
+        final firstAcc = await txn.query('accounts', columns: ['id'], limit: 1);
+        if (firstAcc.isNotEmpty) {
+          safeAccountId = firstAcc.first['id'] as String;
+        }
+      }
+
+      final safeTx = tx.copyWith(
+        categoryId: safeCategoryId,
+        accountId: safeAccountId,
+      );
       
       // 1. Insert transaction row
-      await txn.insert('transactions', tx.toMap(), conflictAlgorithm: ConflictAlgorithm.fail);
+      await txn.insert('transactions', safeTx.toMap(), conflictAlgorithm: ConflictAlgorithm.fail);
       
       // 2. Insert audit log
       await txn.insert('audit_logs', {
         'id': const Uuid().v4(),
-        'transaction_id': tx.id,
+        'transaction_id': safeTx.id,
         'action': 'CREATE',
-        'after_data': tx.toMap().toString(),
+        'after_data': safeTx.toMap().toString(),
         'created_at': now,
       });
       
       // 3. Update account balances
-      if (tx.isTemplate) {
+      if (safeTx.isTemplate) {
         // Templates do not affect active balances!
         return;
       }
       
-      if (tx.isTransfer) {
-        await _adjustBalance(txn, tx.accountId, -tx.amount);
-        if (tx.toAccountId != null) {
-          await _adjustBalance(txn, tx.toAccountId!, tx.amount);
+      if (safeTx.isTransfer) {
+        await _adjustBalance(txn, safeTx.accountId, -safeTx.amount);
+        if (safeTx.toAccountId != null) {
+          await _adjustBalance(txn, safeTx.toAccountId!, safeTx.amount);
         }
-      } else if (tx.isExpense) {
-        await _adjustBalance(txn, tx.accountId, -tx.amount);
-      } else if (tx.isIncome) {
-        await _adjustBalance(txn, tx.accountId, tx.amount);
+      } else if (safeTx.isExpense) {
+        await _adjustBalance(txn, safeTx.accountId, -safeTx.amount);
+      } else if (safeTx.isIncome) {
+        await _adjustBalance(txn, safeTx.accountId, safeTx.amount);
       }
     });
   }

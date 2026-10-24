@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, 'finance_app.db');
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onConfigure: (db) async {
@@ -54,6 +54,14 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX idx_transactions_category ON transactions(category_id)');
       await db.execute('CREATE INDEX idx_transactions_to_account ON transactions(to_account_id)');
       await db.execute('CREATE INDEX idx_transactions_sms ON transactions(sms_raw)');
+    }
+    if (oldVersion < 5) {
+      final list = getStandardCategories();
+      final batch = db.batch();
+      for (final cat in list) {
+        batch.insert('categories', cat, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await batch.commit(noResult: true);
     }
   }
 
@@ -235,125 +243,83 @@ class DatabaseHelper {
     await _insertDefaultData(db);
   }
 
-  static List<Map<String, dynamic>> getStandardCategories() {
-    final list = <Map<String, dynamic>>[];
-    
-    void addGroup(String id, String name, String type, String icon, int color, List<String> children) {
-      list.add({
-        'id': id,
-        'name': name,
-        'type': type,
-        'icon': icon,
-        'color': color,
-        'parent_id': null,
-      });
-      for (final child in children) {
-        final childId = '${id}_${child.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
-        list.add({
-          'id': childId,
-          'name': child,
-          'type': type,
-          'icon': icon,
-          'color': color,
-          'parent_id': id,
-        });
-      }
+  static String resolveCategoryEmoji(String? icon, [String? categoryId]) {
+    if (icon == null || icon.isEmpty) {
+      if (categoryId != null && categoryId.contains('inc')) return '💰';
+      return '💸';
     }
+    const legacyMap = {
+      'food': '🍔',
+      'cart': '🛒',
+      'car': '🚗',
+      'bag': '🛍️',
+      'tv': '🎬',
+      'heart': '💊',
+      'flash': '⚡',
+      'mobile': '📱',
+      'book': '🎓',
+      'refresh': '🔄',
+      'home': '🏠',
+      'plane': '✈️',
+      'dog': '🐾',
+      'people': '👥',
+      'card': '💳',
+      'face': '✨',
+      'dots': '💸',
+      'money': '💰',
+      'laptop': '💻',
+      'chart': '📈',
+      'briefcase': '💼',
+    };
+    if (legacyMap.containsKey(icon.toLowerCase())) {
+      return legacyMap[icon.toLowerCase()]!;
+    }
+    return icon;
+  }
 
-    // EXPENSES
-    addGroup('cat_housing', 'Housing', 'EXPENSE', 'home', 0xFF795548, [
-      'Rent', 'Home Loan EMI', 'Maintenance Charges', 'Property Tax',
-      'Repairs & Renovation', 'Furniture', 'Appliances'
-    ]);
-    addGroup('cat_utilities', 'Utilities', 'EXPENSE', 'flash', 0xFFFF9800, [
-      'Electricity', 'Water', 'Gas', 'Internet/WiFi', 'Mobile Recharge', 'DTH/Cable'
-    ]);
-    addGroup('cat_food', 'Food & Dining', 'EXPENSE', 'food', 0xFFFF5722, [
-      'Groceries', 'Vegetables & Fruits', 'Milk & Dairy', 'Restaurants', 'Fast Food', 'Cafes', 'Food Delivery (Swiggy/Zomato)'
-    ]);
-    addGroup('cat_transport', 'Transportation', 'EXPENSE', 'car', 0xFF2196F3, [
-      'Fuel/Petrol', 'Public Transport', 'Metro', 'Bus', 'Auto/Rickshaw',
-      'Taxi/Uber/Ola', 'Parking', 'Toll Charges', 'Vehicle Maintenance', 'Vehicle Insurance'
-    ]);
-    addGroup('cat_health', 'Health & Fitness', 'EXPENSE', 'heart', 0xFFE91E63, [
-      'Doctor Consultation', 'Medicines', 'Health Insurance', 'Lab Tests',
-      'Gym Membership', 'Yoga', 'Supplements', 'Protein Powder'
-    ]);
-    addGroup('cat_shopping', 'Shopping', 'EXPENSE', 'bag', 0xFF9C27B0, [
-      'Clothing', 'Footwear', 'Accessories', 'Electronics', 'Gadgets', 'Home Decor', 'Gifts'
-    ]);
-    addGroup('cat_entertainment', 'Entertainment', 'EXPENSE', 'tv', 0xFF673AB7, [
-      'Movies', 'OTT Subscriptions', 'Gaming', 'Books', 'Music', 'Hobbies'
-    ]);
-    addGroup('cat_travel', 'Travel', 'EXPENSE', 'plane', 0xFF009688, [
-      'Flights', 'Hotels', 'Local Transport', 'Sightseeing', 'Travel Insurance'
-    ]);
-    addGroup('cat_education', 'Education', 'EXPENSE', 'book', 0xFF3F51B5, [
-      'Courses', 'Certifications', 'Books', 'Workshops', 'Coaching'
-    ]);
-    addGroup('cat_pets', 'Pets', 'EXPENSE', 'dog', 0xFF4CAF50, [
-      'Pet Food', 'Vet Expenses', 'Grooming', 'Accessories'
-    ]);
-    addGroup('cat_family', 'Family', 'EXPENSE', 'people', 0xFF00BCD4, [
-      'Parents Support', 'Child Education', 'Child Care', 'Family Medical'
-    ]);
-    addGroup('cat_financial', 'Financial', 'EXPENSE', 'card', 0xFF607D8B, [
-      'Credit Card Bill', 'Loan EMI', 'Bank Charges', 'Interest Paid', 'Late Fees'
-    ]);
-    addGroup('cat_personal', 'Personal', 'EXPENSE', 'face', 0xFFFFC107, [
-      'Grooming', 'Salon', 'Spa', 'Cosmetics', 'Personal Care'
-    ]);
-    addGroup('cat_donations', 'Donations', 'EXPENSE', 'heart', 0xFF8BC34A, [
-      'Charity', 'Religious Donations', 'Crowdfunding'
-    ]);
-    addGroup('cat_other_exp', 'Miscellaneous', 'EXPENSE', 'dots', 0xFF9E9E9E, [
-      'Unknown', 'Misc Expense', 'Cash Withdrawal'
-    ]);
+  static List<Map<String, dynamic>> getStandardCategories() {
+    return [
+      // EXPENSES
+      {'id': 'cat_food', 'name': 'Food & Dining', 'type': 'EXPENSE', 'icon': '🍔', 'color': 0xFFFF5722, 'parent_id': null},
+      {'id': 'cat_grocery', 'name': 'Groceries', 'type': 'EXPENSE', 'icon': '🛒', 'color': 0xFF4CAF50, 'parent_id': null},
+      {'id': 'cat_telecom', 'name': 'Telecom & Recharge', 'type': 'EXPENSE', 'icon': '📱', 'color': 0xFF00BCD4, 'parent_id': null},
+      {'id': 'cat_transport', 'name': 'Transportation', 'type': 'EXPENSE', 'icon': '🚗', 'color': 0xFF2196F3, 'parent_id': null},
+      {'id': 'cat_shopping', 'name': 'Shopping', 'type': 'EXPENSE', 'icon': '🛍️', 'color': 0xFF9C27B0, 'parent_id': null},
+      {'id': 'cat_utilities', 'name': 'Bills & Utilities', 'type': 'EXPENSE', 'icon': '⚡', 'color': 0xFFFF9800, 'parent_id': null},
+      {'id': 'cat_health', 'name': 'Health & Fitness', 'type': 'EXPENSE', 'icon': '💊', 'color': 0xFFE91E63, 'parent_id': null},
+      {'id': 'cat_entertainment', 'name': 'Entertainment', 'type': 'EXPENSE', 'icon': '🎬', 'color': 0xFF673AB7, 'parent_id': null},
+      {'id': 'cat_subscription', 'name': 'Subscriptions', 'type': 'EXPENSE', 'icon': '🔄', 'color': 0xFF3F51B5, 'parent_id': null},
+      {'id': 'cat_housing', 'name': 'Housing & Rent', 'type': 'EXPENSE', 'icon': '🏠', 'color': 0xFF795548, 'parent_id': null},
+      {'id': 'cat_financial', 'name': 'Financial & EMI', 'type': 'EXPENSE', 'icon': '💳', 'color': 0xFF607D8B, 'parent_id': null},
+      {'id': 'cat_travel', 'name': 'Travel', 'type': 'EXPENSE', 'icon': '✈️', 'color': 0xFF009688, 'parent_id': null},
+      {'id': 'cat_education', 'name': 'Education', 'type': 'EXPENSE', 'icon': '🎓', 'color': 0xFF3F51B5, 'parent_id': null},
+      {'id': 'cat_personal', 'name': 'Personal Care', 'type': 'EXPENSE', 'icon': '✨', 'color': 0xFFFFC107, 'parent_id': null},
+      {'id': 'cat_other_exp', 'name': 'Miscellaneous', 'type': 'EXPENSE', 'icon': '💸', 'color': 0xFF9E9E9E, 'parent_id': null},
 
-    // INCOMES
-    addGroup('cat_salary', 'Salary', 'INCOME', 'money', 0xFF4CAF50, [
-      'Salary', 'Bonus', 'Incentives', 'Overtime', 'Joining Bonus'
-    ]);
-    addGroup('cat_freelance', 'Freelancing', 'INCOME', 'laptop', 0xFF2196F3, [
-      'Consulting', 'Freelance Projects', 'Side Hustle'
-    ]);
-    addGroup('cat_investments_inc', 'Investments', 'INCOME', 'chart', 0xFFFF9800, [
-      'Dividends', 'Interest Income', 'Capital Gains', 'Mutual Fund Redemption', 'Stock Profit'
-    ]);
-    addGroup('cat_rental_inc', 'Rental Income', 'INCOME', 'home', 0xFF795548, [
-      'House Rent Received', 'Commercial Rent'
-    ]);
-    addGroup('cat_other_inc', 'Other Income', 'INCOME', 'dots', 0xFF9E9E9E, [
-      'Gift Received', 'Cashback', 'Rewards', 'Referral Bonus', 'Tax Refund'
-    ]);
-    addGroup('cat_family_inc', 'Family', 'INCOME', 'people', 0xFF00BCD4, [
-      'Family Support', 'Pocket Money'
-    ]);
-    addGroup('cat_business_inc', 'Business', 'INCOME', 'briefcase', 0xFF9C27B0, [
-      'Business Revenue', 'Commission', 'Royalties'
-    ]);
+      // INCOMES
+      {'id': 'cat_salary', 'name': 'Salary', 'type': 'INCOME', 'icon': '💰', 'color': 0xFF4CAF50, 'parent_id': null},
+      {'id': 'cat_freelance', 'name': 'Freelancing & Business', 'type': 'INCOME', 'icon': '💻', 'color': 0xFF2196F3, 'parent_id': null},
+      {'id': 'cat_investments_inc', 'name': 'Investments & Returns', 'type': 'INCOME', 'icon': '📈', 'color': 0xFFFF9800, 'parent_id': null},
+      {'id': 'cat_rental_inc', 'name': 'Rental Income', 'type': 'INCOME', 'icon': '🏠', 'color': 0xFF795548, 'parent_id': null},
+      {'id': 'cat_other_inc', 'name': 'Other Income', 'type': 'INCOME', 'icon': '🎁', 'color': 0xFF9E9E9E, 'parent_id': null},
 
-    // TRANSFERS
-    addGroup('cat_transfer', 'Transfer', 'TRANSFER', 'refresh', 0xFF607D8B, [
-      'Bank to Bank Transfer', 'Savings Transfer', 'Investment Transfer', 'Wallet Top-up',
-      'Credit Card Payment', 'Cash Deposit', 'Cash Withdrawal', 'UPI Wallet Transfer'
-    ]);
-
-    return list;
+      // TRANSFERS
+      {'id': 'cat_transfer', 'name': 'Transfer', 'type': 'TRANSFER', 'icon': '🔁', 'color': 0xFF607D8B, 'parent_id': null},
+    ];
   }
 
   Future<void> ensureStandardCategoriesExist(Database db) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final seeded = prefs.getBool('seeded_detailed_categories') ?? false;
-      if (!seeded) {
+      final versionSynced = prefs.getInt('categories_sync_v2') ?? 0;
+      if (versionSynced < 2) {
         final list = getStandardCategories();
         final batch = db.batch();
         for (final cat in list) {
           batch.insert('categories', cat, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit(noResult: true);
-        await prefs.setBool('seeded_detailed_categories', true);
+        await prefs.setInt('categories_sync_v2', 2);
       }
     } catch (_) {}
   }

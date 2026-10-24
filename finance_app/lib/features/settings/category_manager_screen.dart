@@ -93,7 +93,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> w
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ExpansionTile(
-            leading: Text(parent.icon, style: const TextStyle(fontSize: 24)),
+            leading: Text(DatabaseHelper.resolveCategoryEmoji(parent.icon, parent.id), style: const TextStyle(fontSize: 24)),
             title: Text(
               parent.name,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),

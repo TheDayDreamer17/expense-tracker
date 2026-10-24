@@ -640,19 +640,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   }
 
   String _emoji(String icon) {
-    const map = {
-      'food': '🍔',
-      'cart': '🛒',
-      'car': '🚗',
-      'bag': '🛍️',
-      'tv': '🎬',
-      'heart': '💊',
-      'flash': '⚡',
-      'mobile': '📱',
-      'book': '🎓',
-      'refresh': '🔄'
-    };
-    return map[icon] ?? icon;
+    return DatabaseHelper.resolveCategoryEmoji(icon);
   }
 }
 

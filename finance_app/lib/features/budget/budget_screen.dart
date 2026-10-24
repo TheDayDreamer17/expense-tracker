@@ -359,19 +359,7 @@ class _BudgetProgressCard extends StatelessWidget {
   }
 
   String _emoji(String icon) {
-    const map = {
-      'food': '🍕',
-      'cart': '🛒',
-      'car': '🚗',
-      'bag': '🛍️',
-      'tv': '🎬',
-      'heart': '💊',
-      'flash': '⚡',
-      'mobile': '📱',
-      'book': '🎓',
-      'refresh': '🔄'
-    };
-    return map[icon] ?? '💸';
+    return DatabaseHelper.resolveCategoryEmoji(icon);
   }
 }
 
