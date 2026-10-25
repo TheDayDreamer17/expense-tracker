@@ -36,6 +36,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     echo "----------------------------------------------"
     echo "Building iOS Release Bundle & Packaging IPA..."
     echo "----------------------------------------------"
+    if [ ! -d "ios" ]; then
+        echo "Configuring iOS platform scaffolding..."
+        flutter create --platforms=ios --org com.example .
+    fi
     flutter build ios --release --no-codesign
 
     mkdir -p build/ios/ipa/Payload
